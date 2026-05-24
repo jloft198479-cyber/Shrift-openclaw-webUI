@@ -22,14 +22,14 @@
 ### 安装
 
 ```bash
-git clone https://github.com/你的用户名/Shrift-openclaw-webUI.git
+git clone https://github.com/jloft198479-cyber/Shrift-openclaw-webUI.git
 cd Shrift-openclaw-webUI
 npm install
 ```
 
-### 配置
+### 配置（可选）
 
-复制配置模板并按需修改：
+默认无需配置即可运行。如需自定义，复制配置模板：
 
 ```bash
 cp config.example.json config.json

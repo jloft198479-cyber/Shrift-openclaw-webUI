@@ -7,11 +7,11 @@ let config;
 try {
   config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 } catch (e) {
-  console.error('[Config] Cannot read config.json:', e.message);
-  process.exit(1);
+  console.warn('[Config] config.json not found, using defaults. Copy config.example.json to config.json for customization.');
+  config = {};
 }
 
-const PORT = config.port || 3000;
+const PORT = config.port || 3001;
 const GATEWAY_URL = config.gatewayUrl || 'http://127.0.0.1:18789';
 const GATEWAY_TOKEN = config.gatewayToken || 'hermes-local-dev';
 const OPENCLAW_CONFIG = process.env.OPENCLAW_CONFIG_PATH || config.openclawConfigPath || _detectOpenclawConfig();
