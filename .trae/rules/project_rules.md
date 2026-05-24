@@ -186,3 +186,15 @@ D:\nodejs\node.exe F:\fzz-Project\openclaw-web-ui\server.js
 ### 7. 遇到问题不要死磕
 - **教训**：调试 `store.saveSession()` 返回 false 时，花了大量时间加日志、检查 require 缓存、验证函数源码，但始终没发现根因
 - **正确做法**：**第一性原理 + 逻辑推理**。从 `saveSession` 的执行路径倒推：`saveSession → _ensureSessionsDir → !SESSIONS_DIR → return false`，问题出在 `SESSIONS_DIR` 为空，而 `SESSIONS_DIR` 由 `init()` 设置，`init()` 的参数来自 `OPENCLAW_CONFIG`，`OPENCLAW_CONFIG` 来自环境变量或 config.json——链路一清二楚，不需要死磕
+
+### 8. Start-Process 启动的进程可能遇到 EPERM
+- **现象**：通过 `start.ps1` 的 `Start-Process` 启动的 Web UI 服务器，写入 `D:\AppData\openclaw\sessions` 时报 `EPERM: operation not permitted`，但手动启动同一服务器写入正常
+- **根因**：Windows 文件系统权限在某些启动上下文（如通过 `powershell.exe -File` 间接调用 `Start-Process`）下可能表现不同，导致目标目录不可写
+- **教训**：**不能假设目标目录一定可写，必须有 fallback 机制**。文件写入操作应该先探测可写性，不可写时回退到备选目录
+- **修复**：`fs-store.init()` 增加 `_canWriteDir()` 探测 + 项目目录 fallback。优先使用 openclaw 数据目录，不可写时自动回退到项目目录下的 `sessions/`
+
+### 9. URL 路径参数必须 decodeURIComponent
+- **现象**：`/api/sessions/a%5Cb` 中的 `%5C`（编码的反斜杠）未被解码，`_safeSessionId('a%5Cb')` 检测不到反斜杠
+- **隐患**：虽然 `%5C` 作为文件名字面字符不会造成路径遍历，但与前端行为不一致，且违反 Web 标准
+- **教训**：**HTTP 路径参数必须 `decodeURIComponent` 后再校验**，否则 URL 编码的恶意字符能绕过安全检查
+- **修复**：路由 handler 中 `m[1]` 改为 `decodeURIComponent(m[1])`

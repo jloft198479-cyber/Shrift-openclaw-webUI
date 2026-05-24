@@ -4,10 +4,32 @@ const path = require('path');
 let OPENCLAW_CONFIG = '';
 let SESSIONS_DIR = '';
 
-function init(configPath) {
+function init(configPath, projectDir) {
   OPENCLAW_CONFIG = configPath;
   if (configPath) {
     SESSIONS_DIR = path.join(path.dirname(configPath), 'sessions');
+  }
+  if (!_canWriteDir(SESSIONS_DIR)) {
+    const fallback = projectDir ? path.join(projectDir, 'sessions') : '';
+    if (fallback && _canWriteDir(fallback)) {
+      if (SESSIONS_DIR) {
+        console.warn('[Store] Cannot write to ' + SESSIONS_DIR + ', falling back to ' + fallback);
+      }
+      SESSIONS_DIR = fallback;
+    }
+  }
+}
+
+function _canWriteDir(dir) {
+  if (!dir) return false;
+  try {
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    const testFile = path.join(dir, '.write-test');
+    fs.writeFileSync(testFile, '1', 'utf8');
+    fs.unlinkSync(testFile);
+    return true;
+  } catch (e) {
+    return false;
   }
 }
 

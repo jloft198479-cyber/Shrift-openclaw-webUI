@@ -1,6 +1,7 @@
 node_modules/
 _backup/
 uploads/
+sessions/
 config.json
 *.tmp
 tmp-*

@@ -39,7 +39,7 @@ const GW_HOST = gatewayParsed.hostname || '127.0.0.1';
 const GW_PORT = parseInt(gatewayParsed.port) || 18789;
 
 const store = require('./fs-store');
-store.init(OPENCLAW_CONFIG);
+store.init(OPENCLAW_CONFIG, __dirname);
 
 let _configWatchTimer = null;
 try {
@@ -323,10 +323,10 @@ const ROUTES = [
   { method: 'GET',    pattern: /^\/api\/health$/,                     handler: function (m, req, res) { proxy.checkHealth(res); } },
   { method: 'POST',   pattern: /^\/api\/chat\/send$/,                handler: function (m, req, res) { handleChatSend(req, res); } },
   { method: 'GET',    pattern: /^\/api\/sessions$/,                   handler: function (m, req, res) { handleSessionList(req, res); } },
-  { method: 'GET',    pattern: /^\/api\/sessions\/([^\/]+)$/,          handler: function (m, req, res) { handleSessionGet(m[1], req, res); } },
+  { method: 'GET',    pattern: /^\/api\/sessions\/([^\/]+)$/,          handler: function (m, req, res) { handleSessionGet(decodeURIComponent(m[1]), req, res); } },
   { method: 'POST',   pattern: /^\/api\/sessions$/,                   handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } handleSessionSave(b, res); }); } },
   { method: 'PUT',    pattern: /^\/api\/sessions\/([^\/]+)$/,          handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } handleSessionSave(b, res); }); } },
-  { method: 'DELETE', pattern: /^\/api\/sessions\/([^\/]+)$/,          handler: function (m, req, res) { handleSessionDelete(m[1], res); } },
+  { method: 'DELETE', pattern: /^\/api\/sessions\/([^\/]+)$/,          handler: function (m, req, res) { handleSessionDelete(decodeURIComponent(m[1]), res); } },
 ];
 
 const server = http.createServer(function (req, res) {
