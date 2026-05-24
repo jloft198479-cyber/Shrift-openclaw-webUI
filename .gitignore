@@ -1,0 +1,11 @@
+node_modules/
+_backup/
+uploads/
+config.json
+*.tmp
+tmp-*
+comprehensive-test.js
+simple-test.js
+test-mention.js
+SESSION_RECORD.md
+.workbuddy/
