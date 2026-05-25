@@ -1,6 +1,6 @@
 # 🦐 虾指挥 — Shrift OpenClaw Web UI
 
-一个为 [OpenClaw](https://github.com/nicepkg/openclaw) 打造的轻量级 Web 控制面板，提供对话、Agent 管理、会话持久化等核心功能。
+> ⚠️ **这不是一个独立产品。** 虾指挥是 [OpenClaw](https://github.com/nicepkg/openclaw) 的 Web 控制面板，你需要**先安装并配置好 OpenClaw**，再用它来管理对话和 Agent。
 
 ## ✨ 功能特性
 
@@ -16,8 +16,28 @@
 
 ### 前置条件
 
-- [Node.js](https://nodejs.org/) >= 18
-- [OpenClaw](https://github.com/nicepkg/openclaw) (`npm install -g openclaw`)
+> 虾指挥**不会**自动安装或配置 OpenClaw，以下事项需要你先准备好。
+
+**① 安装 OpenClaw**
+
+```bash
+npm install -g openclaw
+```
+
+**② 配置 OpenClaw**
+
+确保 OpenClaw 已有配置文件。默认位置：
+
+| 系统 | 路径 |
+|------|------|
+| Windows | `%APPDATA%\openclaw\openclaw.json` |
+| macOS / Linux | `~/.openclaw/openclaw.json` |
+
+如果还没有，先创建 OpenClaw 的配置文件（至少配置一个 Agent，否则 Web UI 显示为空）。
+
+**③ 安装 Node.js**
+
+- [Node.js](https://nodejs.org/) >= 18（推荐 LTS 版本）
 
 ### 安装
 
