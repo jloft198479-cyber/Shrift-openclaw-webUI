@@ -1,3 +1,5 @@
+param([switch]$NoBrowser)
+
 $ErrorActionPreference = 'Continue'
 
 $GATEWAY_PORT = 18789
@@ -134,4 +136,6 @@ Write-Host "  Web UI:   http://localhost:$WEB_PORT" -ForegroundColor Cyan
 Write-Host "=====================================" -ForegroundColor Cyan
 Write-Host ""
 
-Start-Process "http://localhost:$WEB_PORT"
+if (-not $NoBrowser) {
+    Start-Process "http://localhost:$WEB_PORT"
+}

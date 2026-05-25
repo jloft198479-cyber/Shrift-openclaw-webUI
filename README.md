@@ -70,15 +70,19 @@ cp config.example.json config.json
 
 ### 启动
 
-**Windows（推荐）：双击 `start.bat`**
+**Windows（推荐）：双击 `shrift.bat`**
 
-在项目文件夹中找到 `start.bat`，直接双击，它会自动：
-1. 探测 Node.js 路径
-2. 启动 OpenClaw Gateway
-3. 启动 Web UI
-4. 打开浏览器
+项目文件夹中的 `shrift.bat` 是最佳启动方式：
 
-完成后不要关闭弹出的命令行窗口，关闭它会同时停止服务。
+1. 双击 `shrift.bat`，弹出命令行窗口自动启动服务
+2. 服务就绪后，自动以**独立应用窗口**打开虾指挥（类似于 Edge 的"安装为应用"体验）
+3. **关闭应用窗口后，服务自动停止**，无需额外操作
+
+> 你也可以在浏览器中打开 `http://localhost:3001` 手动访问。
+
+**备用方案：双击 `start.bat`**
+
+效果与 `shrift.bat` 相同，但会在默认浏览器中打开（非独立窗口）。
 
 **停止：双击 `stop.bat`**
 
@@ -98,13 +102,7 @@ openclaw gateway --port 18789 --verbose
 node server.js
 ```
 
-### 停止
-
-双击 `stop.bat`，或者：
-
-```powershell
-.\stop.ps1
-```
+> **更进一步：** 在虾指挥页面打开后，你可以点击 Edge 地址栏右侧的安装按钮，将其安装为 PWA 应用。安装后会在桌面生成快捷方式，但请注意：**PWA 快捷方式不会自动启动后端服务**，仍需先运行 `shrift.bat`。我们建议使用 `shrift.bat` 作为统一入口。
 
 ## 🏗️ 项目结构
 
