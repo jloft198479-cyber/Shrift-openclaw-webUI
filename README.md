@@ -70,17 +70,23 @@ cp config.example.json config.json
 
 ### 启动
 
-**Windows（推荐）：**
+**Windows（推荐）：双击 `start.bat`**
 
-```powershell
-.\start.ps1
-```
-
-脚本会自动：
+在项目文件夹中找到 `start.bat`，直接双击，它会自动：
 1. 探测 Node.js 路径
 2. 启动 OpenClaw Gateway
 3. 启动 Web UI
 4. 打开浏览器
+
+完成后不要关闭弹出的命令行窗口，关闭它会同时停止服务。
+
+**停止：双击 `stop.bat`**
+
+**或者使用 PowerShell：**
+
+```powershell
+.\start.ps1
+```
 
 **手动启动：**
 
@@ -93,6 +99,8 @@ node server.js
 ```
 
 ### 停止
+
+双击 `stop.bat`，或者：
 
 ```powershell
 .\stop.ps1
