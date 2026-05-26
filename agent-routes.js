@@ -179,6 +179,14 @@ function updateAgent(agentId, body, res) {
     res.end(JSON.stringify({ error: 'Agent not found' }));
     return;
   }
+  for (let i = 0; i < agentList.length; i++) {
+    if ((agentList[i].id === 'main' || agentList[i].default) && agentList[i].subagents) {
+      if (!agentList[i].subagents.allowAgents) agentList[i].subagents.allowAgents = [];
+      if (agentList[i].subagents.allowAgents.indexOf(agentId) < 0) {
+        agentList[i].subagents.allowAgents.push(agentId);
+      }
+    }
+  }
   if (data.agents && data.agents.list) data.agents.list = agentList;
   else data.agents = agentList;
   if (store.writeConfig(data)) {
