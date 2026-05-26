@@ -47,27 +47,6 @@ cd Shrift-openclaw-webUI
 npm install
 ```
 
-### 配置（可选）
-
-默认无需配置即可运行。如需自定义，复制配置模板：
-
-```bash
-cp config.example.json config.json
-```
-
-`config.json` 说明：
-
-```json
-{
-  "port": 3001,
-  "gatewayUrl": "http://127.0.0.1:18789",
-  "gatewayToken": "hermes-local-dev",
-  "openclawConfigPath": ""
-}
-```
-
-- `openclawConfigPath` 留空即可，启动脚本会自动探测 OpenClaw 配置路径
-
 ### 启动
 
 **Windows（推荐）：双击 `shrift.bat`**
@@ -75,8 +54,10 @@ cp config.example.json config.json
 项目文件夹中的 `shrift.bat` 是最佳启动方式：
 
 1. 双击 `shrift.bat`，弹出命令行窗口自动启动服务
-2. 服务就绪后，自动以**独立应用窗口**打开虾指挥（类似于 Edge 的"安装为应用"体验）
-3. **关闭应用窗口后，服务自动停止**，无需额外操作
+2. 首次运行会自动打开**配置向导**（setup.html），引导你设置 OpenClaw 配置文件路径
+3. 配置保存后自动进入主界面
+4. 再次双击直接进入，跳过配置
+5. **关闭应用窗口后，服务自动停止**，无需额外操作
 
 > 你也可以在浏览器中打开 `http://localhost:3001` 手动访问。
 
@@ -90,6 +71,31 @@ cp config.example.json config.json
 
 ```powershell
 .\start.ps1
+```
+
+### 配置
+
+首次启动时，页面会自动检测 OpenClaw 配置文件位置。配置向导会引导你：
+
+1. 点击 **自动检测** 扫描常见安装位置
+2. 手动输入路径后点击 **验证路径** 确认文件有效
+3. 验证通过后点击 **保存配置**，自动进入主界面
+
+如需自定义端口或 Token，复制配置文件模板：
+
+```bash
+cp config.example.json config.json
+```
+
+编辑 `config.json`：
+
+```json
+{
+  "port": 3001,
+  "gatewayUrl": "http://127.0.0.1:18789",
+  "gatewayToken": "hermes-local-dev",
+  "openclawConfigPath": ""
+}
 ```
 
 **手动启动：**
@@ -116,6 +122,7 @@ node server.js
 ├── stop.ps1               # 一键停止（Windows）
 ├── config.example.json    # 配置模板
 ├── web/
+│   ├── setup.html         # 首次启动配置向导
 │   ├── index.html         # 入口页面
 │   ├── css/style.css      # 样式
 │   └── js/
@@ -152,6 +159,9 @@ node server.js
 | DELETE | `/api/sessions/:id` | 删除会话 |
 | POST | `/api/upload` | 文件上传 |
 | GET | `/api/events` | SSE 事件流 |
+| POST | `/api/setup` | 保存配置 |
+| POST | `/api/setup/detect` | 自动检测 OpenClaw 配置路径 |
+| POST | `/api/setup/verify` | 验证配置路径有效性 |
 
 ## 🛡️ 安全特性
 
