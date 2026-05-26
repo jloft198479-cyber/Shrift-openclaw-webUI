@@ -1,3 +1,16 @@
+const AVATAR_SOURCES = {
+  packs: [
+    { path: 'avatars/', files: [
+      'male-james', 'male-michael', 'male-david', 'male-thomas',
+      'male-daniel', 'male-alex', 'male-sam', 'male-leo',
+      'female-emma', 'female-sophia', 'female-olivia', 'female-isabella',
+      'female-mia', 'female-charlotte', 'female-amelia', 'female-harper',
+    ]},
+  ],
+};
+
+const DEFAULT_AVATAR = AVATAR_SOURCES.packs[0].path + AVATAR_SOURCES.packs[0].files[0] + '.svg';
+
 const AgentModal = {
   _unsub: null,
 
@@ -23,7 +36,7 @@ const AgentModal = {
   _showCreate: function() {
     this._renderForm({
       title: '新建助手',
-      data: { name: '', description: '', prompt: '', avatar: '🤖', skills: [] },
+      data: { name: '', description: '', prompt: '', avatar: DEFAULT_AVATAR, skills: [] },
       onSave: function(data) {
         return Api.createAgent(data).then(function() {
           State.setState({ activeModal: null });
@@ -49,7 +62,7 @@ const AgentModal = {
           name: agent.name || agent.id,
           description: agent.description || '',
           prompt: detail.agentsMd || '',
-          avatar: agent.avatar || '🤖',
+          avatar: agent.avatar || DEFAULT_AVATAR,
           skills: (agent.skills || []).map(function(s) { return s.id; }),
           model: detail.model || agent.model || '',
         },
@@ -70,7 +83,26 @@ const AgentModal = {
       showToast('加载失败: ' + (err.message || '未知错误'));
     });
   },
-  
+
+  _buildAvatarPicker: function(currentAvatar) {
+    let html = '<div id="avatar-picker" class="avatar-picker-unified">';
+
+    AVATAR_SOURCES.packs.forEach(function(pack) {
+      html += '<div class="avatar-group"><div class="avatar-group-items avatar-grid">';
+      pack.files.forEach(function(f) {
+        const val = pack.path + f + '.svg';
+        const sel = val === currentAvatar ? ' selected' : '';
+        html += '<div class="avatar-option img-option' + sel + '" data-avatar="' + val + '">'
+          + '<img src="' + val + '" alt="" loading="lazy">'
+          + '</div>';
+      });
+      html += '</div></div>';
+    });
+
+    html += '</div>';
+    return html;
+  },
+
   _renderForm: function(opts) {
     const data = opts.data;
     const isEdit = opts.isEdit || false;
@@ -85,19 +117,6 @@ const AgentModal = {
       });
       return html;
     }
-
-    const emojis = ['🤖', '👩', '👨', '🐱', '🐶', '🌸', '⭐', '🎨', '📝', '🔍', '💻', '🌐', '✏️', '📊', '🎵', '📷'];
-    const avatarFiles = [
-      'male-james', 'male-michael', 'male-david', 'male-thomas',
-      'male-daniel', 'male-alex', 'male-sam', 'male-leo',
-      'female-emma', 'female-sophia', 'female-olivia', 'female-isabella',
-      'female-mia', 'female-charlotte', 'female-amelia', 'female-harper',
-    ];
-
-    const isSvgAvatar = data.avatar && data.avatar.indexOf('avatars/') === 0;
-    const isNew = !isEdit;
-    const currentAvatarFile = isSvgAvatar ? data.avatar.replace('avatars/', '').replace('.svg', '') : (isNew ? avatarFiles[0] : '');
-    const currentEmoji = !isSvgAvatar ? (data.avatar || '🤖') : '🤖';
 
     const selectedSkills = data.skills || [];
     const availableSkills = State.skills || [];
@@ -143,27 +162,12 @@ const AgentModal = {
       + '    <div class="form-divider"></div>'
       + '    <div class="form-section">'
       + '      <label class="section-label">头像</label>'
-      + '      <div class="avatar-tabs">'
-      + '        <span class="avatar-tab' + (isSvgAvatar || isNew ? ' active' : '') + '" data-tab="avatars">头像</span>'
-      + '        <span class="avatar-tab' + (!isSvgAvatar && !isNew ? ' active' : '') + '" data-tab="emojis">表情</span>'
-      + '      </div>'
-      + '      <div id="avatar-picker" class="avatar-grid"' + (isSvgAvatar || isNew ? '' : ' style="display:none"') + '>'
-      + avatarFiles.map(function(f) {
-          return '<div class="avatar-option' + (f === currentAvatarFile ? ' selected' : '') + '" data-avatar="avatars/' + f + '.svg">'
-            + '<img src="avatars/' + f + '.svg" alt="" loading="lazy">'
-            + '</div>';
-        }).join('')
-      + '      </div>'
-      + '      <div id="emoji-picker"' + (isSvgAvatar || isNew ? ' style="display:none"' : '') + '>'
-      + emojis.map(function(e) {
-          return '<div class="emoji-option' + (e === currentEmoji ? ' selected' : '') + '" data-emoji="' + e + '">' + e + '</div>';
-        }).join('')
-      + '      </div>'
+      + this._buildAvatarPicker(data.avatar || DEFAULT_AVATAR)
       + '    </div>'
       + '    <div class="form-divider"></div>'
       + '    <div class="form-section">'
-    + '      <label class="section-label">详情介绍</label>'
-    + '      <div class="prompt-tags">'
+      + '      <label class="section-label">详情介绍</label>'
+      + '      <div class="prompt-tags">'
       + '        <span class="prompt-tag" data-tag="#身份角色">#身份角色</span>'
       + '        <span class="prompt-tag" data-tag="#领域专业">#领域专业</span>'
       + '        <span class="prompt-tag" data-tag="#说话风格">#说话风格</span>'
@@ -182,23 +186,23 @@ const AgentModal = {
       + '    <div class="form-section">'
       + '      <label class="section-label">语言模型</label>'
       + '      <select id="agent-model" class="agent-model-select">'
-    + buildModelOptions(data.model)
-    + '      </select>'
-    + '    </div>'
-    + (opts.teamMembers && opts.teamMembers.length > 0 ? (
-      '    <div class="form-divider"></div>'
-      + '    <div class="form-section">'
-      + '      <label class="section-label">团队成员</label>'
-      + '      <div class="team-members-grid">'
-      + opts.teamMembers.map(function(m) {
-          return '<div class="team-member-card">'
-            + '<span class="team-member-id">' + escapeHtml(m.display || m.id) + '</span>'
-            + (m.summary ? '<span class="team-member-summary">' + escapeHtml(m.summary) + '</span>' : '')
-            + '</div>';
-        }).join('')
-      + '      </div>'
+      + buildModelOptions(data.model)
+      + '      </select>'
       + '    </div>'
-    ) : '')
+      + (opts.teamMembers && opts.teamMembers.length > 0 ? (
+        '    <div class="form-divider"></div>'
+        + '    <div class="form-section">'
+        + '      <label class="section-label">团队成员</label>'
+        + '      <div class="team-members-grid">'
+        + opts.teamMembers.map(function(m) {
+            return '<div class="team-member-card">'
+              + '<span class="team-member-id">' + escapeHtml(m.display || m.id) + '</span>'
+              + (m.summary ? '<span class="team-member-summary">' + escapeHtml(m.summary) + '</span>' : '')
+              + '</div>';
+          }).join('')
+        + '      </div>'
+        + '    </div>'
+      ) : '')
       + '  </div>'
       + '  <div class="modal-footer">'
       + '    <button class="modal-btn secondary" data-action="close">取消</button>'
@@ -229,27 +233,10 @@ const AgentModal = {
         }
       }
 
-      const emojiOpt = e.target.closest('.emoji-option');
-      if (emojiOpt) {
-        overlay.querySelectorAll('#emoji-picker .emoji-option').forEach(function(el) { el.classList.remove('selected'); });
-        emojiOpt.classList.add('selected');
-        return;
-      }
-
       const avatarOpt = e.target.closest('.avatar-option');
       if (avatarOpt) {
-        overlay.querySelectorAll('#avatar-picker .avatar-option').forEach(function(el) { el.classList.remove('selected'); });
+        overlay.querySelectorAll('.avatar-option').forEach(function(el) { el.classList.remove('selected'); });
         avatarOpt.classList.add('selected');
-        return;
-      }
-
-      const avatarTab = e.target.closest('.avatar-tab');
-      if (avatarTab && !avatarTab.classList.contains('active')) {
-        overlay.querySelectorAll('.avatar-tab').forEach(function(el) { el.classList.remove('active'); });
-        avatarTab.classList.add('active');
-        const showAvatars = avatarTab.dataset.tab === 'avatars';
-        document.getElementById('avatar-picker').style.display = showAvatars ? '' : 'none';
-        document.getElementById('emoji-picker').style.display = showAvatars ? 'none' : '';
         return;
       }
 
@@ -296,16 +283,8 @@ const AgentModal = {
     const desc = document.getElementById('agent-desc');
     const prompt = document.getElementById('agent-prompt');
 
-    const avatarTab = document.querySelector('.avatar-tab.active');
-    const isAvatarTab = avatarTab && avatarTab.dataset.tab === 'avatars';
-    let selectedAvatar = '🤖';
-    if (isAvatarTab) {
-      const sel = document.querySelector('#avatar-picker .avatar-option.selected');
-      if (sel) selectedAvatar = sel.dataset.avatar;
-    } else {
-      const sel = document.querySelector('#emoji-picker .emoji-option.selected');
-      if (sel) selectedAvatar = sel.dataset.emoji;
-    }
+    const selOpt = document.querySelector('.avatar-option.selected');
+    const selectedAvatar = selOpt ? selOpt.dataset.avatar : DEFAULT_AVATAR;
 
     const data = {
       name: name ? name.value.trim() : '',

@@ -3,11 +3,13 @@ const path = require('path');
 
 let OPENCLAW_CONFIG = '';
 let SESSIONS_DIR = '';
+let DATA_DIR = '';
 
 function init(configPath, projectDir) {
   OPENCLAW_CONFIG = configPath;
   if (configPath) {
-    SESSIONS_DIR = path.join(path.dirname(configPath), 'sessions');
+    DATA_DIR = path.dirname(configPath);
+    SESSIONS_DIR = path.join(DATA_DIR, 'sessions');
   }
   if (!_canWriteDir(SESSIONS_DIR)) {
     const fallback = projectDir ? path.join(projectDir, 'sessions') : '';
@@ -277,12 +279,20 @@ function _readAgentSummary(workspace) {
   return { name: name, emoji: emoji, summary: summary };
 }
 
+function _isEmojiChar(val) {
+  if (!val || typeof val !== 'string') return false;
+  return !val.match(/[\/\\\.]/);
+}
+
 function _buildSubAgentsSection(subAgents) {
   const lines = ['## Sub-Agents', '', 'You can spawn sub-agents using the `sessions_spawn` tool:', ''];
   subAgents.forEach(function (sub) {
     const ws = resolveHome(sub.workspace || '');
-    const info = ws ? _readAgentSummary(ws) : { name: sub.id, emoji: '', summary: sub.description || '' };
-    const display = info.emoji ? info.emoji + ' ' + (info.name || sub.id) : (info.name || sub.id);
+    const info = ws ? _readAgentSummary(ws) : { name: '', emoji: '', summary: '' };
+    const name = sub.name || info.name || sub.id;
+    const rawEmoji = (sub.identity && sub.identity.emoji) || info.emoji || '';
+    const emoji = _isEmojiChar(rawEmoji) ? rawEmoji : '';
+    const display = emoji ? emoji + ' ' + name : name;
     const desc = info.summary || sub.description || '';
     lines.push('- **' + sub.id + '** (' + display + ') — ' + desc);
   });
@@ -308,8 +318,11 @@ function _buildTeamMembersSection(currentAgentId, allAgents) {
   const lines = ['', '## Team Members', '', 'You can collaborate with these agents:', ''];
   siblings.forEach(function (sib) {
     const ws = resolveHome(sib.workspace || '');
-    const info = ws ? _readAgentSummary(ws) : { name: sib.id, emoji: '', summary: sib.description || '' };
-    const display = info.emoji ? info.emoji + ' ' + (info.name || sib.id) : (info.name || sib.id);
+    const info = ws ? _readAgentSummary(ws) : { name: '', emoji: '', summary: '' };
+    const name = sib.name || info.name || sib.id;
+    const rawEmoji = (sib.identity && sib.identity.emoji) || info.emoji || '';
+    const emoji = _isEmojiChar(rawEmoji) ? rawEmoji : '';
+    const display = emoji ? emoji + ' ' + name : name;
     const desc = info.summary || sib.description || '';
     lines.push('- **' + sib.id + '** (' + display + ') — ' + desc);
   });
@@ -464,6 +477,7 @@ module.exports = {
   readFile: readFile,
   writeFile: writeFile,
   removeDir: removeDir,
+  getDataDir: function () { return DATA_DIR; },
   getAgentList: getAgentList,
   findAgentRaw: findAgentRaw,
   getAgentWorkspace: getAgentWorkspace,

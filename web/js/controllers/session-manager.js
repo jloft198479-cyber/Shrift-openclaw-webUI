@@ -149,8 +149,8 @@ const SessionManager = {
 
   exitAgentMode: function () {
     State.setState({ currentAgent: '' });
-    const sessions = State.sessions;
-    if (sessions.length > 0) {
+    const sessions = State.sessions || [];
+    if (sessions.length > 0 && sessions[0] && sessions[0].id) {
       SessionManager.selectSession(sessions[0].id);
     } else {
       ChatView.showWelcome();

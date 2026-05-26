@@ -13,7 +13,8 @@ const ChatView = {
     AttachmentBar.pendingAttachments = [];
     WelcomeView.updateAgentModeBar();
     ModelSwitcher.updateBar();
-    State.on('models', ModelSwitcher.updateBar);
+    State.on('model-list', ModelSwitcher.updateBar);
+    State.on('model-switch', ModelSwitcher.updateBar);
   },
 
   showWelcome: function (opts) { WelcomeView.showWelcome(opts); },

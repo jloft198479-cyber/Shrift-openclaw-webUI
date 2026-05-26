@@ -3,15 +3,23 @@ const SessionList = {
   _unsub: null,
 
   init: function () {
-    this._unsub = State.on('sessions', function () { SessionList.render(); });
-    State.on('filter', function () { SessionList.render(); });
+    this._unsub = [
+      State.on('session-list', function () { SessionList.render(); }),
+      State.on('session-switch', function () { SessionList.render(); }),
+      State.on('filter', function () { SessionList.render(); })
+    ];
     this.render();
   },
 
   _getAgentLabel: function (agentId) {
     if (!agentId) return '';
     const a = State.findAgent(agentId);
-    return a ? (a.avatar || a.name.slice(0,1)) : agentId.slice(0,1);
+    if (!a) return agentId.slice(0,1);
+    const av = a.avatar || '';
+    if (av && typeof av === 'string' && av.indexOf('/') < 0 && av.indexOf('\\') < 0) {
+      return av;
+    }
+    return (a.name || a.id).slice(0,1);
   },
 
   render: function () {

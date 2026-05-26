@@ -140,10 +140,16 @@ function getAgentIcon(name) {
   return icons[name] || '🤖';
 }
 
-/* 渲染 Agent 头像：SVG 路径用 img，否则用 emoji 文本 */
+function _isImageAvatar(val) {
+  if (val.indexOf('://') > 0) return true;
+  if (val.startsWith('avatars/')) return true;
+  if (/\.(svg|png|jpg|jpeg|gif|webp)$/i.test(val)) return true;
+  return false;
+}
+
 function renderAgentAvatar(avatar, name) {
   const icon = avatar || getAgentIcon(name);
-  if (typeof icon === 'string' && icon.startsWith('avatars/')) {
+  if (typeof icon === 'string' && _isImageAvatar(icon)) {
     return '<img src="' + icon + '" alt="" class="agent-avatar-img">';
   }
   return icon;

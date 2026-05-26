@@ -61,7 +61,7 @@ function createWsClient(gwUrl, gwToken) {
 
     try {
       ws = new WebSocket(wsUrl, {
-        headers: { 'Origin': 'http://localhost:18789' }
+        headers: { 'Origin': wsProtocol + '//' + parsed.hostname + ':' + (parsed.port || '18789') }
       });
     } catch (e) {
       console.error('[WS] Create error:', e.message);

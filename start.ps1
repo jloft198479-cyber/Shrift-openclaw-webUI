@@ -2,35 +2,97 @@ param([switch]$NoBrowser)
 
 $ErrorActionPreference = 'Continue'
 
-$GATEWAY_PORT = 18789
 $WEB_PORT = 3001
 $SERVER_JS = "$PSScriptRoot\server.js"
+$CONFIG_JSON = "$PSScriptRoot\config.json"
 
+# ── 检测 Node.js ─────────────────────────────────────
 $NODE = (Get-Command node -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
 if (-not $NODE) {
-    $NODE = ''
-}
-if (-not $NODE -and (Test-Path 'D:\nodejs\node.exe')) {
-    $NODE = 'D:\nodejs\node.exe'
-    $env:PATH = 'D:\nodejs;D:\nodejs\npm-global;' + $env:PATH
-}
-if (-not $NODE) {
-    Write-Host "[FAIL] node not found in PATH. Please install Node.js first." -ForegroundColor Red
+    Write-Host "[FAIL] 未找到 Node.js，请先安装 Node.js（https://nodejs.org）" -ForegroundColor Red
     exit 1
 }
 
+# ── 检测项目依赖（npm install） ─────────────────────
+$NODE_MODULES = "$PSScriptRoot\node_modules"
+if (-not (Test-Path "$NODE_MODULES\ws\package.json")) {
+    Write-Host "[FAIL] 未找到项目依赖，请先运行: cd /d `"$PSScriptRoot`" && npm install" -ForegroundColor Red
+    exit 1
+}
+
+# ── 读取 config.json（如果存在） ─────────────────────
+$GATEWAY_PORT = 18789
+$WEB_PORT = 3001
+$GATEWAY_TOKEN = 'hermes-local-dev'
+if (Test-Path $CONFIG_JSON) {
+    try {
+        $cfg = Get-Content $CONFIG_JSON -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($cfg.port) { $WEB_PORT = $cfg.port }
+        if ($cfg.gatewayUrl) {
+            $uri = [uri]$cfg.gatewayUrl
+            if ($uri.Port -gt 0) { $GATEWAY_PORT = $uri.Port }
+        }
+        if ($cfg.gatewayToken) { $GATEWAY_TOKEN = $cfg.gatewayToken }
+        if ($cfg.openclawConfigPath) {
+            $OPENCLAW_CONFIG_PATH_FROM_CFG = $cfg.openclawConfigPath
+        } else {
+            $OPENCLAW_CONFIG_PATH_FROM_CFG = ''
+        }
+    } catch {}
+} else {
+    $OPENCLAW_CONFIG_PATH_FROM_CFG = ''
+}
+
+# ── 尝试从 openclaw.json 读取 Token/端口 ────────────
+function _readOpenclawConfig {
+    param($path)
+    if (-not (Test-Path $path)) { return $null }
+    try {
+        $data = Get-Content $path -Raw -Encoding UTF8 | ConvertFrom-Json
+        return $data
+    } catch { return $null }
+}
+
+$openclawData = $null
+if ($env:OPENCLAW_CONFIG_PATH -and (Test-Path $env:OPENCLAW_CONFIG_PATH)) {
+    $openclawData = _readOpenclawConfig $env:OPENCLAW_CONFIG_PATH
+}
+if (-not $openclawData) {
+    $candidates = @()
+    if ($env:APPDATA) { $candidates += "$env:APPDATA\openclaw\openclaw.json" }
+    if ($env:LOCALAPPDATA) { $candidates += "$env:LOCALAPPDATA\openclaw\openclaw.json" }
+    if ($env:USERPROFILE) { $candidates += "$env:USERPROFILE\.openclaw\openclaw.json" }
+    if ($env:HOME) { $candidates += "$env:HOME\.openclaw\openclaw.json" }
+    foreach ($c in $candidates) {
+        $d = _readOpenclawConfig $c
+        if ($d) { $openclawData = $d; break }
+    }
+}
+if ($openclawData -and $openclawData.gateway) {
+    if ($openclawData.gateway.port) { $GATEWAY_PORT = $openclawData.gateway.port }
+    if ($openclawData.gateway.auth -and $openclawData.gateway.auth.token) {
+        $GATEWAY_TOKEN = $openclawData.gateway.auth.token
+    }
+}
+
+# ── 检测 OpenClaw CLI ──────────────────────────────
 $NPM_GLOBAL = & $NODE -e "console.log(require('child_process').execSync('npm prefix -g').toString().trim())" 2>$null
 $OPENCLAW_MJS = if ($NPM_GLOBAL) { Join-Path $NPM_GLOBAL 'node_modules\openclaw\openclaw.mjs' } else { '' }
 if (-not $OPENCLAW_MJS -or -not (Test-Path $OPENCLAW_MJS)) {
     $OPENCLAW_MJS = & $NODE -e "try{console.log(require.resolve('openclaw/openclaw.mjs'))}catch{console.log('')}" 2>$null
 }
 if (-not $OPENCLAW_MJS -or -not (Test-Path $OPENCLAW_MJS)) {
-    Write-Host "[FAIL] openclaw not found. Please run: npm install -g openclaw" -ForegroundColor Red
+    Write-Host "[FAIL] 未找到 OpenClaw，请运行: npm install -g openclaw" -ForegroundColor Red
     exit 1
 }
 
-if ($env:OPENCLAW_STATE_DIR) {
+# ── 确定 OpenClaw 数据目录 ─────────────────────────
+if ($OPENCLAW_CONFIG_PATH_FROM_CFG -and $OPENCLAW_CONFIG_PATH_FROM_CFG.Length -gt 0 -and (Test-Path $OPENCLAW_CONFIG_PATH_FROM_CFG)) {
+    $OPENCLAW_STATE_DIR = Split-Path $OPENCLAW_CONFIG_PATH_FROM_CFG -Parent
+    $OPENCLAW_CONFIG_PATH = $OPENCLAW_CONFIG_PATH_FROM_CFG
+} elseif ($env:OPENCLAW_STATE_DIR) {
     $OPENCLAW_STATE_DIR = $env:OPENCLAW_STATE_DIR
+    $OPENCLAW_CONFIG_PATH = Join-Path $OPENCLAW_STATE_DIR 'openclaw.json'
 } else {
     $OPENCLAW_STATE_DIR = if ($env:OS -eq 'Windows_NT') {
         Join-Path $env:APPDATA 'openclaw'
@@ -39,18 +101,18 @@ if ($env:OPENCLAW_STATE_DIR) {
     } else {
         Join-Path $env:HOME '.openclaw'
     }
+    $OPENCLAW_CONFIG_PATH = Join-Path $OPENCLAW_STATE_DIR 'openclaw.json'
 }
-
-$OPENCLAW_CONFIG_PATH = Join-Path $OPENCLAW_STATE_DIR 'openclaw.json'
 
 Write-Host "[INFO] Node: $NODE" -ForegroundColor Gray
 Write-Host "[INFO] OpenClaw: $OPENCLAW_MJS" -ForegroundColor Gray
 Write-Host "[INFO] State dir: $OPENCLAW_STATE_DIR" -ForegroundColor Gray
 
+# ── 健康检查函数 ────────────────────────────────────
 function Test-Gateway {
     try {
         $req = [System.Net.HttpWebRequest]::Create("http://127.0.0.1:$GATEWAY_PORT/v1/models")
-        $req.Headers.Add('Authorization', 'Bearer hermes-local-dev')
+        $req.Headers.Add('Authorization', "Bearer $GATEWAY_TOKEN")
         $req.Timeout = 3000
         $req.Method = 'GET'
         $resp = $req.GetResponse()
@@ -74,11 +136,12 @@ function Test-WebUI {
     }
 }
 
+# ── 启动 Gateway ────────────────────────────────────
 $gwRunning = Test-Gateway
 if ($gwRunning) {
-    Write-Host "[OK] Gateway already running on port $GATEWAY_PORT" -ForegroundColor Green
+    Write-Host "[OK] Gateway 已在端口 $GATEWAY_PORT 运行" -ForegroundColor Green
 } else {
-    Write-Host "[..] Starting Gateway on port $GATEWAY_PORT..." -ForegroundColor Yellow
+    Write-Host "[..] 启动 Gateway（端口 $GATEWAY_PORT）..." -ForegroundColor Yellow
     $env:OPENCLAW_STATE_DIR = $OPENCLAW_STATE_DIR
     $env:OPENCLAW_CONFIG_PATH = $OPENCLAW_CONFIG_PATH
     $gwLog = "$env:TEMP\openclaw-gateway.log"
@@ -90,23 +153,24 @@ if ($gwRunning) {
         Start-Sleep -Seconds 2
         $waited += 2
         if (Test-Gateway) {
-            Write-Host "[OK] Gateway ready (${waited}s)" -ForegroundColor Green
+            Write-Host "[OK] Gateway 就绪（${waited}s）" -ForegroundColor Green
             break
         }
         Write-Host "." -NoNewline
     }
     if ($waited -ge $maxWait) {
-        Write-Host "`n[FAIL] Gateway did not start within ${maxWait}s" -ForegroundColor Red
+        Write-Host "`n[FAIL] Gateway 未能在 ${maxWait}s 内启动" -ForegroundColor Red
         if (Test-Path $gwLog) { Get-Content $gwLog -Tail 20 | Write-Host -ForegroundColor Red }
         exit 1
     }
 }
 
+# ── 启动 Web UI ────────────────────────────────────
 $webRunning = Test-WebUI
 if ($webRunning) {
-    Write-Host "[OK] Web UI already running on port $WEB_PORT" -ForegroundColor Green
+    Write-Host "[OK] Web UI 已在端口 $WEB_PORT 运行" -ForegroundColor Green
 } else {
-    Write-Host "[..] Starting Web UI on port $WEB_PORT..." -ForegroundColor Yellow
+    Write-Host "[..] 启动 Web UI（端口 $WEB_PORT）..." -ForegroundColor Yellow
     $env:OPENCLAW_STATE_DIR = $OPENCLAW_STATE_DIR
     $env:OPENCLAW_CONFIG_PATH = $OPENCLAW_CONFIG_PATH
     $webLog = "$env:TEMP\openclaw-webui.log"
@@ -118,12 +182,12 @@ if ($webRunning) {
         Start-Sleep -Seconds 1
         $waited += 1
         if (Test-WebUI) {
-            Write-Host "[OK] Web UI ready (${waited}s)" -ForegroundColor Green
+            Write-Host "[OK] Web UI 就绪（${waited}s）" -ForegroundColor Green
             break
         }
     }
     if ($waited -ge $maxWait) {
-        Write-Host "[FAIL] Web UI did not start within ${maxWait}s" -ForegroundColor Red
+        Write-Host "[FAIL] Web UI 未能在 ${maxWait}s 内启动" -ForegroundColor Red
         if (Test-Path $webLog) { Get-Content $webLog -Tail 20 | Write-Host -ForegroundColor Red }
         exit 1
     }

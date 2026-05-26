@@ -2,7 +2,10 @@ const AgentList = {
   _unsub: null,
 
   init: function () {
-    this._unsub = State.on('agents', function () { AgentList.render(); });
+    this._unsub = [
+      State.on('agent-list', function () { AgentList.render(); }),
+      State.on('agent-switch', function () { AgentList.render(); })
+    ];
     this.render();
   },
 
@@ -46,6 +49,6 @@ const AgentList = {
   },
 
   destroy: function () {
-    if (this._unsub) this._unsub();
+    if (this._unsub) this._unsub.forEach(function (fn) { fn(); });
   },
 };

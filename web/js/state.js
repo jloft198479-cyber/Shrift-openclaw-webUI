@@ -31,20 +31,22 @@ const State = {
 
   _emit: function (event, data) {
     if (this._listeners[event]) {
-      this._listeners[event].forEach(function (cb) { cb(data); });
+      this._listeners[event].forEach(function (cb) {
+        try { cb(data); } catch (e) { console.error('[State] Listener error on "' + event + '":', e); }
+      });
     }
   },
 
   setState: function (partial) {
     const events = new Set();
     const keyToEvent = {
-      sessions: 'sessions',
-      currentSessionId: 'sessions',
-      currentAgent: 'agents',
-      agents: 'agents',
+      sessions: 'session-list',
+      currentSessionId: 'session-switch',
+      currentAgent: 'agent-switch',
+      agents: 'agent-list',
       skills: 'skills',
-      models: 'models',
-      defaultModel: 'models',
+      models: 'model-list',
+      defaultModel: 'model-switch',
       messages: 'messages',
       connected: 'connection',
       streaming: 'streaming',
@@ -53,7 +55,7 @@ const State = {
       editingAgent: 'modal',
       pendingDelegation: 'delegation',
       filter: 'filter',
-      lastMainSession: 'sessions',
+      lastMainSession: 'session-list',
     };
     for (const key in partial) {
       if (this[key] !== partial[key]) {

@@ -1,7 +1,19 @@
 $ErrorActionPreference = 'Continue'
 
+$CONFIG_JSON = "$PSScriptRoot\config.json"
 $GATEWAY_PORT = 18789
 $WEB_PORT = 3001
+
+if (Test-Path $CONFIG_JSON) {
+    try {
+        $cfg = Get-Content $CONFIG_JSON -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($cfg.port) { $WEB_PORT = [int]$cfg.port }
+        if ($cfg.gatewayUrl) {
+            $uri = [uri]$cfg.gatewayUrl
+            if ($uri.Port -gt 0) { $GATEWAY_PORT = [int]$uri.Port }
+        }
+    } catch {}
+}
 
 function Stop-ByPort {
     param([int]$Port)

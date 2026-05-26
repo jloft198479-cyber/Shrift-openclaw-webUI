@@ -22,7 +22,8 @@ function listAgents(res) {
     return {
       id: a.id || '',
       name: a.name || a.id || '',
-      avatar: (a.identity && a.identity.emoji) || '🤖',
+      // identity.emoji 是该 Agent 的头像图标，对外展示为 avatar 字段
+      avatar: (a.identity && a.identity.emoji) || '',
       description: a.description || (a.identity && a.identity.description) || '',
       workspace: ws,
       skills: store.scanSkills(ws),
@@ -51,7 +52,7 @@ function getAgentDetail(agentId, res) {
   res.end(JSON.stringify({
     id: raw.id,
     name: raw.name || raw.id,
-    avatar: (raw.identity && raw.identity.emoji) || '🤖',
+    avatar: (raw.identity && raw.identity.emoji) || '',
     description: raw.description || (raw.identity && raw.identity.description) || '',
     workspace: ws,
     agentsMd: agentsMd,
@@ -90,9 +91,7 @@ function createAgent(body, res) {
   }
   let id = body.id || body.name.toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
   if (!id) {
-    res.writeHead(400, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ error: 'Invalid agent ID' }));
-    return;
+    id = 'agent-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   }
   const data = store.readConfig();
   if (!data) {
@@ -109,17 +108,30 @@ function createAgent(body, res) {
       return;
     }
   }
-  const home = process.env.USERPROFILE || process.env.HOME || '';
-  const wsPath = path.join(home, '.openclaw', 'workspace-' + id);
-  const wsRelative = '~/.openclaw/workspace-' + id;
+  const dataDir = store.getDataDir();
+  const agentsDir = dataDir ? path.join(dataDir, 'agents') : '';
+  let wsPath = agentsDir ? path.join(agentsDir, 'workspace-' + id) : '';
+  const wsRelative = agentsDir ? wsPath : '~/.openclaw/workspace-' + id;
+  if (!wsPath) {
+    const home = process.env.USERPROFILE || process.env.HOME || '';
+    wsPath = path.join(home, '.openclaw', 'workspace-' + id);
+  }
   if (!require('fs').existsSync(wsPath)) require('fs').mkdirSync(wsPath, { recursive: true });
   const prompt = body.prompt || '';
   if (prompt) store.writeFile(path.join(wsPath, 'AGENTS.md'), prompt);
-  const avatar = body.avatar || '🤖';
+  const avatar = body.avatar || '';
   const desc = body.description || '';
   const newAgent = { id: id, name: body.name, workspace: wsRelative, identity: { emoji: avatar }, description: desc };
   if (body.model) newAgent.model = { primary: body.model };
   agentList.push(newAgent);
+  for (let i = 0; i < agentList.length; i++) {
+    if ((agentList[i].id === 'main' || agentList[i].default) && agentList[i].subagents) {
+      if (!agentList[i].subagents.allowAgents) agentList[i].subagents.allowAgents = [];
+      if (agentList[i].subagents.allowAgents.indexOf(id) < 0) {
+        agentList[i].subagents.allowAgents.push(id);
+      }
+    }
+  }
   if (data.agents && data.agents.list) data.agents.list = agentList;
   else data.agents = agentList;
   if (store.writeConfig(data)) {
@@ -164,6 +176,12 @@ function updateAgent(agentId, body, res) {
     res.end(JSON.stringify({ error: 'Agent not found' }));
     return;
   }
+  for (let i = 0; i < agentList.length; i++) {
+    if (agentList[i].subagents && agentList[i].subagents.allowAgents) {
+      const idx = agentList[i].subagents.allowAgents.indexOf(agentId);
+      if (idx >= 0) agentList[i].subagents.allowAgents.splice(idx, 1);
+    }
+  }
   if (data.agents && data.agents.list) data.agents.list = agentList;
   else data.agents = agentList;
   if (store.writeConfig(data)) {
@@ -198,6 +216,12 @@ function deleteAgent(agentId, res) {
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Agent not found' }));
     return;
+  }
+  for (let i = 0; i < agentList.length; i++) {
+    if (agentList[i].subagents && agentList[i].subagents.allowAgents) {
+      const idx = agentList[i].subagents.allowAgents.indexOf(agentId);
+      if (idx >= 0) agentList[i].subagents.allowAgents.splice(idx, 1);
+    }
   }
   if (data.agents && data.agents.list) data.agents.list = agentList;
   else data.agents = agentList;
