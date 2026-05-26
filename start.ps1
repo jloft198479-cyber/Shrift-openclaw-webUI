@@ -17,8 +17,10 @@ if (-not $NODE) {
 $NODE_MODULES = "$PSScriptRoot\node_modules"
 if (-not (Test-Path "$NODE_MODULES\ws\package.json")) {
     Write-Host "[..] Dependencies missing, running npm install..." -ForegroundColor Yellow
+    $NPM = Join-Path (Split-Path $NODE -Parent) 'npm.cmd'
+    if (-not (Test-Path $NPM)) { $NPM = 'npm' }
     Push-Location $PSScriptRoot
-    & $NODE -e "const c=require('child_process'); c.execSync('npm install',{cwd:'$PSScriptRoot'.replace(/\\/g,'/'),stdio:'inherit',shell:true})" 2>&1
+    & $NPM install 2>&1
     Pop-Location
     if (-not (Test-Path "$NODE_MODULES\ws\package.json")) {
         Write-Host "[FAIL] Auto install failed. Please run: cd /d `"$PSScriptRoot`" & npm install" -ForegroundColor Red
@@ -179,7 +181,6 @@ if ($webRunning) {
 } else {
     Write-Host "[..] Starting Web UI on port $WEB_PORT..." -ForegroundColor Yellow
     $env:OPENCLAW_STATE_DIR = $OPENCLAW_STATE_DIR
-    $env:OPENCLAW_CONFIG_PATH = $OPENCLAW_CONFIG_PATH
     $webLog = "$env:TEMP\openclaw-webui.log"
     Start-Process -FilePath $NODE -ArgumentList "`"$SERVER_JS`"" -WindowStyle Hidden -RedirectStandardOutput $webLog -RedirectStandardError "$env:TEMP\openclaw-webui-err.log"
 

@@ -37,6 +37,7 @@ function _resolveOpenclawConfig(cfg) {
 let OPENCLAW_CONFIG = _resolveOpenclawConfig(config);
 const WEB_DIR = path.join(__dirname, 'web');
 
+// SETUP_MODE: 仅当无法通过任何方式定位到 openclaw.json 时才启用
 let SETUP_MODE = !OPENCLAW_CONFIG;
 if (SETUP_MODE) {
   console.log('[Config] openclaw.json not found. Starting in setup mode.');
@@ -59,6 +60,7 @@ function _refreshSetupMode() {
 
 function _detectOpenclawConfig() {
   const candidates = [];
+  if (process.env.OPENCLAW_STATE_DIR) candidates.push(path.join(process.env.OPENCLAW_STATE_DIR, 'openclaw.json'));
   if (process.env.APPDATA) candidates.push(path.join(process.env.APPDATA, 'openclaw', 'openclaw.json'));
   if (process.env.LOCALAPPDATA) candidates.push(path.join(process.env.LOCALAPPDATA, 'openclaw', 'openclaw.json'));
   if (process.env.USERPROFILE) candidates.push(path.join(process.env.USERPROFILE, '.openclaw', 'openclaw.json'));
