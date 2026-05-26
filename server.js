@@ -1,10 +1,10 @@
-// ── 依赖检查：用户是否执行了 npm install ────────────
+// ── 依赖检查 ────────────────────────────────
 try {
   require.resolve('ws');
 } catch (e) {
   console.error('');
-  console.error('[FAIL] 缺少依赖模块 "ws"。请先在项目目录运行: npm install');
-  console.error('[FAIL] 如果未安装 Node.js，请先安装: https://nodejs.org');
+  console.error('[FAIL] 缺少依赖模块，请双击项目中的 shrift.bat 自动安装并启动');
+  console.error('[FAIL] 或手动运行: npm install && node server.js');
   console.error('');
   process.exit(1);
 }
