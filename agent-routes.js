@@ -168,6 +168,9 @@ function updateAgent(agentId, body, res) {
         if (!agentList[i].model) agentList[i].model = {};
         agentList[i].model.primary = body.model;
       }
+      const ws = store.resolveHome(agentList[i].workspace || '');
+      const prompt = body.prompt;
+      if (prompt && ws) store.writeFile(require('path').join(ws, 'AGENTS.md'), prompt);
       break;
     }
   }
@@ -175,12 +178,6 @@ function updateAgent(agentId, body, res) {
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Agent not found' }));
     return;
-  }
-  for (let i = 0; i < agentList.length; i++) {
-    if (agentList[i].subagents && agentList[i].subagents.allowAgents) {
-      const idx = agentList[i].subagents.allowAgents.indexOf(agentId);
-      if (idx >= 0) agentList[i].subagents.allowAgents.splice(idx, 1);
-    }
   }
   if (data.agents && data.agents.list) data.agents.list = agentList;
   else data.agents = agentList;
