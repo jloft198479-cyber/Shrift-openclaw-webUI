@@ -12,6 +12,14 @@
   --accent:       #D97706;
   --accent-light: #FFFBEB;
   --accent-hover: #B45309;
+  --danger:       #DC2626;
+  --danger-light: #FEF2F2;
+  --success:      #16a34a;
+  --user-avatar-bg:    #D6D3D1;
+  --user-avatar-text:   #78716C;
+  --new-chat-hover:     #F5E0CE;
+  --stop-btn-bg:        #57534E;
+  --stop-btn-hover:     #44403C;
   --border:       #E5E7EB;
   --border-light: #F3F4F6;
   --user-bubble:  #F3F4F6;
@@ -116,7 +124,8 @@ body.resizing-agent-section * {
   width: 240px;
   min-width: 240px;
   background: var(--sidebar-bg);
-  border-right: 1px solid var(--border);
+  /* border-right: 1px solid var(--border);  ← 改为 box-shadow 极淡分隔 */
+  box-shadow: 1px 0 0 0 var(--border-light);
   display: flex;
   flex-direction: column;
   user-select: none;
@@ -167,25 +176,20 @@ body.resizing-agent-section * {
 
 /* 折叠按钮 */
 #sidebar-collapse-btn {
-  position: absolute;
-  right: -12px;
-  top: 24px;
+  margin-left: auto;
   width: 24px; height: 24px;
   border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border: none;
+  background: transparent;
   color: var(--text-3);
   font-size: var(--font-sm);
   cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  z-index: calc(var(--z-dropdown) + 1);
   transition: all 150ms ease;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 #sidebar-collapse-btn:hover {
   color: var(--text);
   background: var(--accent-light);
-  border-color: var(--accent);
 }
 #sidebar.collapsed #sidebar-collapse-btn {
   right: -12px;
@@ -197,6 +201,7 @@ body.resizing-agent-section * {
   display: flex;
   align-items: center;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .sidebar-header .logo {
@@ -208,8 +213,8 @@ body.resizing-agent-section * {
 .sidebar-header .logo img { display: block; max-height: 26px; width: auto; }
 
 .sidebar-header h1 {
-  font-size: var(--font-xl);
-  font-weight: var(--weight-semibold);
+  font-size: var(--font-md);
+  font-weight: var(--weight-medium);
   color: var(--text);
   letter-spacing: -0.01em;
 }
@@ -241,7 +246,7 @@ body.resizing-agent-section * {
   padding: 11px 14px;
   border: 1.5px dashed var(--accent);
   border-radius: var(--radius-sm);
-  background: var(--accent-light);
+  background: transparent;
   color: var(--accent);
   font-size: var(--font-lg);
   font-weight: var(--weight-semibold);
@@ -250,17 +255,18 @@ body.resizing-agent-section * {
   display: flex; align-items: center; gap: 6px;
 }
 #new-chat-btn:hover {
-  background: #F5E0CE;
+  background: var(--new-chat-hover);
   border-color: var(--accent);
   border-style: solid;
 }
 #new-chat-btn:active { transform: scale(0.985); }
 
-/* ── 筛选栏 ─────────────────────────────────────────────── */
+/* ── 筛选栏（内联到标题旁） ─────────────────────────────────────── */
 #filter-bar {
   display: flex;
   gap: 4px;
-  padding: 0 12px 8px;
+  padding: 0;
+  margin-left: auto;
 }
 .filter-btn {
   flex: 1;
@@ -306,7 +312,7 @@ body.resizing-agent-section * {
 }
 .agent-resize-divider:hover,
 .resizing-agent-section .agent-resize-divider {
-  background: linear-gradient(to bottom, transparent 40%, var(--primary) 48%, var(--primary) 52%, transparent 60%);
+  background: linear-gradient(to bottom, transparent 40%, var(--accent) 48%, var(--accent) 52%, transparent 60%);
 }
 
 #agent-section {
@@ -325,21 +331,20 @@ body.resizing-agent-section * {
 .session-item {
   padding: 10px 12px;
   margin-bottom: 4px;
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: background var(--transition), box-shadow var(--transition);
+  transition: background var(--transition);
   position: relative;
   display: flex;
   align-items: center;
   gap: 8px;
 }
-.session-item:hover { background: rgba(0,0,0,0.03); }
+.session-item:hover { background: rgba(0,0,0,0.02); }
 
 .session-item.active {
-  background: var(--accent-light);
-  box-shadow: inset 3px 0 0 var(--accent);
+  background: transparent;
+  box-shadow: inset 2px 0 0 var(--accent);
 }
-.session-item.active:hover { background: var(--accent-light); }
 
 .session-item .icon {
   width: 20px; height: 20px;
@@ -439,8 +444,8 @@ body.resizing-agent-section * {
   white-space: nowrap;
 }
 .dropdown-item:hover { background: rgba(0,0,0,0.04); }
-.dropdown-item.danger { color: #DC2626; }
-.dropdown-item.danger:hover { background: #FEF2F2; }
+.dropdown-item.danger { color: var(--danger); }
+.dropdown-item.danger:hover { background: var(--danger-light); }
 
 .dropdown-divider {
   height: 1px;
@@ -526,8 +531,8 @@ body.resizing-agent-section * {
   color: #fff;
 }
 .message.user .avatar {
-  background: #D6D3D1;
-  color: #78716C;
+  background: var(--user-avatar-bg);
+  color: var(--user-avatar-text);
   font-size: var(--font-base);
 }
 
@@ -614,7 +619,7 @@ body.resizing-agent-section * {
  font-family: var(--font);
 }
 .cb-copy:hover { color: var(--text); background: rgba(0,0,0,0.05); }
-.cb-copy.copied { color: #16a34a; }
+.cb-copy.copied { color: var(--success); }
 .code-pre {
   background: var(--sidebar-bg) !important;
   border: none !important;
@@ -759,7 +764,7 @@ body.resizing-agent-section * {
   transition: background var(--transition);
   z-index: var(--z-dropdown);
 }
-#scroll-bottom:hover { background: #FAF8F5; }
+#scroll-bottom:hover { background: var(--accent-light); }
 
 /* ── 思考指示器 ─────────────────────────────────────────── */
 #thinking-indicator {
@@ -857,8 +862,8 @@ body.resizing-agent-section * {
 #send-btn:active { transform: scale(0.94); }
 
 #send-btn svg { width: 16px; height: 16px; }
-#send-btn.is-stop { background: #57534E; }
-#send-btn.is-stop:hover { background: #44403C; }
+#send-btn.is-stop { background: var(--stop-btn-bg); }
+#send-btn.is-stop:hover { background: var(--stop-btn-hover); }
 #send-btn:disabled {
   background: var(--border);
   cursor: default;
@@ -1466,9 +1471,9 @@ body.resizing-agent-section * {
   margin-left: 6px;
 }
 #agent-section .section-title {
-  font-size: var(--font-lg);
-  font-weight: var(--weight-semibold);
-  color: var(--text);
+  font-size: var(--font-sm);
+  font-weight: var(--weight-normal);
+  color: var(--text-2);
 }
 #agent-section .section-actions {
   display: flex;
