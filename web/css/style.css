@@ -67,6 +67,12 @@
   --weight-medium: 500;
   --weight-semibold: 600;
 
+  /* ── 代码块深色主题（Claude 风格） ─── */
+  --code-header-bg:  #2d2d2d;
+  --code-header-text: #ccc;
+  --code-header-border: #444;
+  --code-copy-hover: rgba(255,255,255,0.1);
+
   /* ── 动效 ─── */
   --transition:   150ms cubic-bezier(0.4, 0, 0.2, 1);
 
@@ -548,16 +554,17 @@ body.resizing-agent-section * {
   overflow: hidden;                 /* 防止内容溢出气泡边界 */
 }
 .message.assistant .bubble {
-  background: var(--surface);
-  border-top-left-radius: 6px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.04);
+  background: transparent;
+  border-left: none;
+  box-shadow: none;
   color: var(--text);
-  border-left: 3px solid var(--accent);
+  padding: 14px 0;
 }
 .message.user .bubble {
-  background: var(--user-bubble);
-  border-top-right-radius: 6px;
-  color: var(--text);
+  background: transparent;
+  color: var(--text-2);
+  text-align: right;
+  padding: 14px 0;
   white-space: pre-wrap;
 }
 
@@ -585,7 +592,7 @@ body.resizing-agent-section * {
 /* ── 代码块装饰（语言标签 + 复制按钮） ──────── */
 .code-block {
   margin: 8px 0;
-  border-radius: var(--radius-sm);
+  border-radius: 10px;
   border: 1px solid var(--border);
   overflow: hidden;
   background: var(--sidebar-bg);
@@ -595,30 +602,31 @@ body.resizing-agent-section * {
   align-items: center;
   justify-content: space-between;
   padding: 4px 12px;
-  background: var(--sidebar-bg);
- border-bottom: 1px solid var(--border-light);
+  background: var(--code-header-bg);
+  color: var(--code-header-text);
+  border-bottom: 1px solid var(--code-header-border);
   user-select: none;
 }
 .cb-lang {
   font-size: var(--font-xs);
   font-weight: var(--weight-semibold);
-  color: var(--text-3);
+  color: var(--code-header-text);
   text-transform: lowercase;
   letter-spacing: 0.3px;
 }
 .cb-copy {
   border: none;
   background: none;
-  color: var(--text-3);
+  color: var(--code-header-text);
   font-size: var(--font-sm);
   font-weight: var(--weight-medium);
   cursor: pointer;
   padding: 2px 8px;
   border-radius: var(--radius-xs);
   transition: color var(--transition), background var(--transition);
- font-family: var(--font);
+  font-family: var(--font);
 }
-.cb-copy:hover { color: var(--text); background: rgba(0,0,0,0.05); }
+.cb-copy:hover { color: #fff; background: var(--code-copy-hover); }
 .cb-copy.copied { color: var(--success); }
 .code-pre {
   background: var(--sidebar-bg) !important;
@@ -803,14 +811,14 @@ body.resizing-agent-section * {
   display: flex;
   flex-direction: column;
   background: var(--surface);
-  border: 1.5px solid var(--border);
-  border-radius: var(--radius);
+  border: 1px solid var(--border-light);
+  border-radius: 16px;
   padding: 10px 10px 0 16px;
-  transition: border-color var(--transition), box-shadow var(--transition);
+  transition: border-color var(--transition);
 }
 .input-wrap:focus-within {
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(217,119,6,0.15);
+  box-shadow: none;
 }
 
 .input-row {
