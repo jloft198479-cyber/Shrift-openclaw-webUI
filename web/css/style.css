@@ -294,6 +294,7 @@ body.resizing-agent-section * {
   color: var(--accent);
   border-color: transparent;
   box-shadow: none;
+  transition: all var(--transition);
 }
 
 /* ── 会话列表 ────────────────────────────────────────────── */
