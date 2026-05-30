@@ -176,16 +176,16 @@ const Utils = {
 
   /**
    * 渲染 Agent 头像
-   * @param {string} avatar - 头像值（URL 或 emoji）
+   * @param {string} avatar - 头像路径（SVG/图片 URL）
    * @param {string} name - Agent 名称
    * @returns {string} HTML 字符串
    */
   renderAgentAvatar: function (avatar, name) {
-    const icon = avatar || '🤖';
-    if (typeof icon === 'string' && this._isImageAvatar(icon)) {
-      return '<img src="' + icon + '" alt="" class="agent-avatar-img">';
+    if (!avatar) return name ? name.slice(0, 1) : '';
+    if (typeof avatar === 'string' && this._isImageAvatar(avatar)) {
+      return '<img src="' + avatar + '" alt="" class="agent-avatar-img">';
     }
-    return icon;
+    return avatar;
   },
 
   /**
@@ -194,11 +194,23 @@ const Utils = {
    * @returns {Array} 标准化后的列表
    */
   normalizeAgents: function (rawList) {
+    const AVATAR_POOL = [
+      'avatars/male-james.svg', 'avatars/male-michael.svg', 'avatars/male-david.svg',
+      'avatars/male-thomas.svg', 'avatars/male-daniel.svg', 'avatars/male-alex.svg',
+      'avatars/male-sam.svg', 'avatars/male-leo.svg',
+      'avatars/female-emma.svg', 'avatars/female-sophia.svg', 'avatars/female-olivia.svg',
+      'avatars/female-isabella.svg', 'avatars/female-mia.svg', 'avatars/female-charlotte.svg',
+      'avatars/female-amelia.svg', 'avatars/female-harper.svg',
+    ];
     const self = this;
-    return (rawList || []).map(function (a) {
+    return (rawList || []).map(function (a, i) {
+      let avatar = a.avatar || '';
+      if (!avatar || !self._isImageAvatar(avatar)) {
+        avatar = AVATAR_POOL[i % AVATAR_POOL.length];
+      }
       return Object.assign({}, a, {
         displayName: a.id === 'main' ? self.APP_NAME : (a.name || a.id),
-        avatar: a.id === 'main' ? self.LOGO_SRC : (a.avatar || '')
+        avatar: avatar
       });
     });
   },

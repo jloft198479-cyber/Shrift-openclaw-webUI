@@ -27,7 +27,7 @@ const AgentList = {
     }
 
     list.innerHTML = visibleAgents.map(function (a) {
-      const iconHtml = renderAgentAvatar(a.avatar || '🤖', a.displayName || a.name || a.id);
+      const iconHtml = renderAgentAvatar(a.avatar, a.displayName || a.name || a.id);
       const displayName = a.displayName || a.name || a.id;
       const desc = a.description ? '<span class="agent-meta">' + escapeHtml(a.description) + '</span>' : '';
       const isActive = a.id === State.currentAgent;

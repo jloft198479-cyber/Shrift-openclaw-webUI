@@ -45,7 +45,7 @@ const ChatController = {
     }
 
     const agentId = State.interactionMode === 'direct' ? (State.currentAgent || 'main') : 'main';
-    const actualAgentId = agentId;
+    let actualAgentId = agentId;
     DebugTrace.log('sendMessage', { text: text.substring(0, 80), interactionMode: State.interactionMode, agentId: agentId });
 
     const sessionResult = SessionInteraction.ensureSession(text);

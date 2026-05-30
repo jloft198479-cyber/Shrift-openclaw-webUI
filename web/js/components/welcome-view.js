@@ -13,8 +13,8 @@ const WelcomeView = {
 
     if (opts && opts.agent) {
       const agent = opts.agent;
-      const icon = agent.avatar || '🤖';
       const displayName = agent.displayName || agent.name || '';
+      const icon = agent.avatar || displayName.slice(0, 1);
       const desc = agent.description || '输入你的需求，该助手将为你处理';
       welcome.innerHTML = '<div class="welcome-logo" style="font-size:32px;line-height:1">' + renderAgentAvatar(icon, displayName) + '</div>'
         + '<h2>与 ' + escapeHtml(displayName) + ' 对话</h2>'
@@ -75,8 +75,8 @@ const WelcomeView = {
     if (existing) existing.remove();
 
     const agent = State.findAgent(State.currentAgent);
-    const avatar = (agent && agent.avatar) || '🤖';
     const displayName = (agent && agent.displayName) || (agent && agent.name) || State.currentAgent;
+    const avatar = (agent && agent.avatar) || displayName.slice(0, 1);
 
     const bar = document.createElement('div');
     bar.id = 'agent-mode-bar';

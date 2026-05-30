@@ -91,7 +91,8 @@ function _extractTeamFromMd(md) {
     if (inTeamSection) {
       const m = line.match(/^-\s+\*\*(.+?)\*\*\s+\((.+?)\)(?:\s+—\s+(.+))?$/);
       if (m) {
-        members.push({ id: m[1], display: m[2], summary: m[3] || '' });
+        const display = m[2].replace(/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}]\s*/u, '').trim();
+        members.push({ id: m[1], display: display, summary: m[3] || '' });
       }
     }
   }

@@ -15,10 +15,6 @@ const SessionList = {
     if (!agentId) return '';
     const a = State.findAgent(agentId);
     if (!a) return agentId.slice(0,1);
-    const av = a.avatar || '';
-    if (av && typeof av === 'string' && av.indexOf('/') < 0 && av.indexOf('\\') < 0) {
-      return av;
-    }
     return (a.displayName || a.name || a.id).slice(0, 1);
   },
 
