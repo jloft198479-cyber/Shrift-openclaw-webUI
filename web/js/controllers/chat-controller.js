@@ -139,21 +139,16 @@ const ChatController = {
                 DebugTrace.log('dispatch-safety-timeout', { active: self._activeSubagents.size, completed: self._completedSubagents.size });
                 if (self._activeSubagents.size > 0 && self._completedSubagents.size >= self._activeSubagents.size) {
                   self._checkDispatchComplete();
-                } else if (self._activeSubagents.size === 0) {
-                  DebugTrace.log('dispatch-safety-timeout-no-progress', {});
-                  State.setState({ dispatching: false });
-                  self._hideDispatchStatusBar();
-                  StreamRenderer._resetSendBtn();
                 }
               }
-            }, 15000);
+            }, 30000);
             self._dispatchLongTimer = setTimeout(function () {
               if (State.dispatching) {
-                DebugTrace.log('dispatch-safety-timeout-long', {});
+                DebugTrace.log('dispatch-long-timeout', {});
                 self._clearDispatchState();
                 StreamRenderer._resetSendBtn();
               }
-            }, 120000);
+            }, 300000);
           }
           StreamRenderer.endStreaming();
           if (session) {
@@ -258,6 +253,7 @@ const ChatController = {
     State.setState({ sessions: SessionStore.getList() });
 
     this._updateDispatchStatusBar();
+    this._resetDispatchSafetyTimer();
     this._checkDispatchComplete();
   },
 
@@ -283,6 +279,7 @@ const ChatController = {
       }
     }
     this._updateDispatchStatusBar();
+    this._resetDispatchSafetyTimer();
   },
 
   handleSubagentDone: function (agentId, sessionId) {
@@ -301,6 +298,7 @@ const ChatController = {
 
     MessageRenderer.updateProgressBlock(agentId, 'done');
     this._updateDispatchStatusBar();
+    this._resetDispatchSafetyTimer();
     this._checkDispatchComplete();
   },
 
@@ -356,5 +354,21 @@ const ChatController = {
     this._progressElements = {};
     this._spawnDetected = false;
     this._hideDispatchStatusBar();
+  },
+
+  _resetDispatchSafetyTimer: function () {
+    if (!State.dispatching) return;
+    if (this._dispatchSafetyTimer) {
+      clearTimeout(this._dispatchSafetyTimer);
+    }
+    var self = this;
+    this._dispatchSafetyTimer = setTimeout(function () {
+      if (State.dispatching) {
+        DebugTrace.log('dispatch-safety-timeout', { active: self._activeSubagents.size, completed: self._completedSubagents.size });
+        if (self._activeSubagents.size > 0 && self._completedSubagents.size >= self._activeSubagents.size) {
+          self._checkDispatchComplete();
+        }
+      }
+    }, 30000);
   },
 };
