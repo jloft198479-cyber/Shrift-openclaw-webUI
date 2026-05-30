@@ -333,39 +333,9 @@ const ChatController = {
   },
 
   _updateDispatchStatusBar: function () {
-    const bar = document.getElementById('dispatch-status-bar');
-    if (!bar) return;
-
-    bar.style.opacity = '1';
-
-    if (this._activeSubagents.size === 0) {
-      if (State.dispatching) {
-        bar.querySelector('.dispatch-status-text').textContent = '智能调度中…';
-        bar.style.display = 'flex';
-      }
-      return;
-    }
-
-    const parts = [];
-    for (const aid of this._activeSubagents) {
-      const agent = State.findAgent(aid);
-      const name = agent ? (agent.displayName || agent.name) : aid;
-      const isDone = this._completedSubagents.has(aid);
-      parts.push(name + (isDone ? '(已完成)' : '(执行中)'));
-    }
-
-    bar.querySelector('.dispatch-status-text').textContent = '智能调度中… ' + parts.join(' ');
-    bar.style.display = 'flex';
   },
 
   _hideDispatchStatusBar: function () {
-    const bar = document.getElementById('dispatch-status-bar');
-    if (!bar) return;
-    bar.style.opacity = '0';
-    setTimeout(function () {
-      bar.style.display = 'none';
-      bar.style.opacity = '1';
-    }, 300);
   },
 
   _clearDispatchState: function () {

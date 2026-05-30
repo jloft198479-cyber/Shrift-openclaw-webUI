@@ -25,7 +25,8 @@ function _getAgentColor(name) {
 function _buildAgentLabelHtml(agent, resolvedAgentName) {
   const avatar = (agent && agent.avatar) || '';
   const desc = (agent && agent.description) || '';
-  const agentAvatar = renderAgentAvatar(avatar || (resolvedAgentName ? resolvedAgentName.slice(0, 1) : ''), resolvedAgentName);
+  const avatarSrc = avatar || (resolvedAgentName === APP_NAME ? LOGO_SRC : (resolvedAgentName ? resolvedAgentName.slice(0, 1) : ''));
+  const agentAvatar = renderAgentAvatar(avatarSrc, resolvedAgentName);
   let html = '<span class="agent-label-avatar">' + agentAvatar + '</span>';
   html += '<span class="agent-label-name">' + escapeHtml(resolvedAgentName) + '</span>';
   if (desc) {

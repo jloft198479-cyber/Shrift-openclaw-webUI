@@ -1030,30 +1030,6 @@ body.resizing-agent-section * {
   to { transform: rotate(360deg); }
 }
 
-/* ── 智能调度状态栏 ─────────────────────────────────────── */
-#dispatch-status-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 32px;
-  max-width: 720px;
-  margin: 0 auto;
-  width: 100%;
-  font-size: 13px;
-  color: var(--muted);
-  background: var(--surface);
-  transition: opacity 0.3s ease;
-}
-.dispatch-spinner {
-  display: inline-block;
-  width: 12px; height: 12px;
-  border: 1.5px solid #999;
-  border-top-color: #333;
-  border-radius: 50%;
-  animation: subagentSpin 0.8s linear infinite;
-  flex-shrink: 0;
-}
-
 /* ── 气泡内进度块 ───────────────────────────────────────── */
 .bubble-progress {
   display: flex;
@@ -1134,16 +1110,16 @@ body.resizing-agent-section * {
 
 /* ── 气泡内分隔线 ───────────────────────────────────────── */
 .bubble-separator {
-  border-top: 1px solid var(--border-light);
-  margin: 10px 0 6px;
+  border-top: 1px solid rgba(0,0,0,0.06);
+  margin: 18px 0 14px;
 }
 
 /* ── 气泡内子 Agent 内容块 ──────────────────────────────── */
 .bubble-content-block {
-  margin-top: 2px;
+  margin-top: 4px;
 }
 .bubble-content-block .agent-content {
-  margin-top: 2px;
+  margin-top: 4px;
 }
 
 /* ── 输入区 ─────────────────────────────────────────────── */
