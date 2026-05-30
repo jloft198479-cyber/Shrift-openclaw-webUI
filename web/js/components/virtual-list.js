@@ -359,9 +359,11 @@ const VirtualList = {
     const div = document.createElement('div');
     div.className = 'message ' + (message.role || 'assistant');
 
+    const avatarLabel = message.role === 'user' ? '你'
+      : (message.agentId ? message.agentId.slice(0, 1).toUpperCase() : 'AI');
     const avatar = document.createElement('div');
     avatar.className = 'avatar';
-    avatar.textContent = message.role === 'user' ? '你' : 'AI';
+    avatar.textContent = avatarLabel;
     div.appendChild(avatar);
 
     const bubble = document.createElement('div');
