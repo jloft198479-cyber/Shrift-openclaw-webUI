@@ -223,6 +223,11 @@ const SessionManager = {
       }
       try {
         ChatView.appendMessage(msg.role, msg.content || '', false, msg.thinking || '', msgAgentId);
+        if (msg.announces && msg.announces.length > 0) {
+          for (let k = 0; k < msg.announces.length; k++) {
+            MessageRenderer.appendToLastAssistantMessage(msg.announces[k].content, msg.announces[k].agentId || '');
+          }
+        }
       } catch (e) {
         console.error('[SessionManager] Failed to render history message:', e);
       }

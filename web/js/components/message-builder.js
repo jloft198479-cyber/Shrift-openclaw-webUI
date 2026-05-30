@@ -12,14 +12,30 @@ const MessageBuilder = {
       if (m.role === 'assistant' && m.agentId && m.agentId !== targetAgentId) {
         const srcAgent = State.findAgent(m.agentId);
         const srcName = srcAgent ? (srcAgent.displayName || srcAgent.name) : m.agentId;
-        return { role: 'assistant', content: '[' + srcName + ' said]: ' + m.content };
+        var announceText = m.content || '';
+        if (m.announces && m.announces.length > 0) {
+          for (let k = 0; k < m.announces.length; k++) {
+            announceText += '\n\n---\n\n';
+            if (m.announces[k].agentId) announceText += '[' + m.announces[k].agentId + '] ';
+            announceText += m.announces[k].content;
+          }
+        }
+        return { role: 'assistant', content: '[' + srcName + ' said]: ' + announceText };
       }
 
       if (m.role === 'user' && m.attachments && m.attachments.length > 0) {
         return MessageBuilder.buildMultimodalMessage(m.content, m.attachments);
       }
 
-      return { role: m.role, content: m.content };
+      var msgContent = m.content || '';
+      if (m.announces && m.announces.length > 0) {
+        for (let k = 0; k < m.announces.length; k++) {
+          msgContent += '\n\n---\n\n';
+          if (m.announces[k].agentId) msgContent += '[' + m.announces[k].agentId + '] ';
+          msgContent += m.announces[k].content;
+        }
+      }
+      return { role: m.role, content: msgContent };
     });
 
     if (apiMessages.length === 0) {

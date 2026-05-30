@@ -72,13 +72,13 @@ const SessionInteraction = {
     if (!session || !session.messages) return;
     for (let i = session.messages.length - 1; i >= 0; i--) {
       if (session.messages[i].role === 'assistant') {
-        var existing = session.messages[i].content || '';
-        var separator = existing ? '\n\n---\n\n' : '';
-        var prefix = agentId ? '[' + agentId + '] ' : '';
-        session.messages[i].content = existing + separator + prefix + content;
+        if (!session.messages[i].announces) {
+          session.messages[i].announces = [];
+        }
+        session.messages[i].announces.push({ agentId: agentId || '', content: content });
         return;
       }
     }
-    session.messages.push({ role: 'assistant', content: content });
+    session.messages.push({ role: 'assistant', content: '', announces: [{ agentId: agentId || '', content: content }] });
   },
 };
