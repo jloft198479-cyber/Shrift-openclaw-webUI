@@ -33,7 +33,7 @@ function _showMentionPopup(input, atPos) {
 
   const agents = (State.agents || []).filter(function (a) { return a.id !== 'main' && !a.default; });
   const filtered = agents.filter(function (a) {
-    const name = (a.name || a.id || '').toLowerCase();
+    const name = (a.displayName || a.name || a.id || '').toLowerCase();
     return name.indexOf(_mentionQuery) >= 0;
   });
 
@@ -43,17 +43,19 @@ function _showMentionPopup(input, atPos) {
   }
 
   popup.innerHTML = filtered.map(function (a) {
-    return '<div class="mention-item" data-agent-id="' + escapeHtml(a.id) + '" data-agent-name="' + escapeHtml(a.name || a.id) + '">'
-      + '<span class="mention-icon">' + renderAgentAvatar(a.avatar, a.name) + '</span>'
-      + '<span class="mention-name">' + escapeHtml(a.name || a.id) + '</span>'
+    var dn = a.displayName || a.name || a.id;
+    return '<div class="mention-item" data-agent-id="' + escapeHtml(a.id) + '" data-agent-name="' + escapeHtml(dn) + '">'
+      + '<span class="mention-icon">' + renderAgentAvatar(a.avatar, dn) + '</span>'
+      + '<span class="mention-name">' + escapeHtml(dn) + '</span>'
       + '</div>';
   }).join('');
 
   const rect = input.getBoundingClientRect();
   const inputArea = document.getElementById('input-area');
   const areaRect = inputArea ? inputArea.getBoundingClientRect() : rect;
-  popup.style.left = (rect.left + Math.min(atPos * 8, rect.width - 200)) + 'px';
-  popup.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+  popup.style.left = areaRect.left + 'px';
+  popup.style.bottom = (window.innerHeight - areaRect.top + 4) + 'px';
+  popup.style.minWidth = areaRect.width + 'px';
   popup.style.display = 'block';
 
   popup.onclick = function (e) {

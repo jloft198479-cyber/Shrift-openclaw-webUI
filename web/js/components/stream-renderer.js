@@ -77,14 +77,17 @@ const StreamRenderer = {
   },
 
   /**
-   * 请求一帧渲染（去重，用 rAF 合并）
+   * 请求一帧渲染（去重，用 rAF 合并 + debounce 50ms）
    */
   scheduleRender: function () {
     if (this._rafId) return;
     const self = this;
     this._rafId = requestAnimationFrame(function () {
       self._rafId = null;
-      self.renderBubble();
+      clearTimeout(self._debounceTimer);
+      self._debounceTimer = setTimeout(function () {
+        self.renderBubble();
+      }, 50);
     });
   },
 
@@ -128,9 +131,12 @@ const StreamRenderer = {
     if (input) input.focus();
 
     const st = this._streamState;
-    if (st && st._thinkBlock) {
-      const toggle = st._thinkBlock.querySelector('.thinking-toggle');
-      if (toggle) toggle.textContent = '💭 已深度思考';
+    if (st && st.bubble) {
+      st.bubble.classList.remove('streaming-cursor');
+      if (st._thinkBlock) {
+        const toggle = st._thinkBlock.querySelector('.thinking-toggle');
+        if (toggle) toggle.textContent = '💭 已深度思考';
+      }
     }
 
     this.resetStreamState();
@@ -140,9 +146,7 @@ const StreamRenderer = {
       if (!st.bubble.querySelector('.msg-actions')) {
         const actions = document.createElement('div');
         actions.className = 'msg-actions';
-        actions.innerHTML = '<button class="msg-act-btn" data-action="copy" title="复制">📋</button>'
-          + '<button class="msg-act-btn" data-action="regenerate" title="即将支持" disabled>🔄</button>'
-          + '<button class="msg-act-btn" data-action="delete" title="即将支持" disabled>🗑</button>';
+        actions.innerHTML = '<button class="msg-act-btn" data-action="copy" title="复制">📋</button>';
         st.bubble.appendChild(actions);
       }
     }

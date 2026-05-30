@@ -171,8 +171,9 @@ const Api = {
 
   fetchAgents: async function () {
     const data = await this._fetch('/api/agents');
-    State.setState({ agents: data });
-    return data;
+    const normalized = normalizeAgents(data);
+    State.setState({ agents: normalized });
+    return normalized;
   },
 
   createAgent: async function (data) {
@@ -235,6 +236,17 @@ const Api = {
       State.setState({ connected: false });
       return false;
     }
+  },
+
+  fetchSessionMessages: function (sessionId, callback) {
+    fetch('/api/sessions/' + encodeURIComponent(sessionId))
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (callback) callback(data.messages || []);
+      })
+      .catch(function () {
+        if (callback) callback([]);
+      });
   },
 
   _fetch: async function (url, opts) {

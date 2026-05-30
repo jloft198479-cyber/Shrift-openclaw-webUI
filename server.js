@@ -89,6 +89,7 @@ const agentRoutes = require('./agent-routes');
 const proxy = require('./proxy').createProxy(GW_HOST, GW_PORT, GATEWAY_TOKEN, store);
 const sessionSync = require('./session-sync');
 const rosterSync = require('./roster-sync');
+const debugTrace = require('./debug-trace');
 
 // ── WebSocket 客户端（Gateway 事件桥）──────────────────
 
@@ -111,9 +112,36 @@ try {
     sseManager.broadcast({ type: 'status', ws: 'disconnected' });
   });
 
+  function _broadcastSubagentProgress(agentId, toolName) {
+    if (!agentId || agentId === 'main') return;
+    debugTrace.trace('subagent-progress-broadcast', { agentId: agentId, toolName: toolName });
+    var _progress = {};
+    _progress[agentId] = { toolName: toolName };
+    sseManager.broadcast({
+      type: 'subagent-progress',
+      progress: _progress
+    });
+  }
+
   wsClient.emitter.on('event', function (data) {
     sseManager.broadcast({ type: 'gateway', data: data });
     sessionSync.onSubagentGatewayEvent(data);
+    var eventName = data.event || '';
+    var payload = data.payload || {};
+    var sessionKey = payload.sessionKey || '';
+    debugTrace.trace('gateway-event', { event: eventName, sessionKey: sessionKey, data: JSON.stringify(payload).substring(0, 500) });
+    if ((eventName === 'session.tool' || eventName === 'agent') && payload) {
+      var d = payload.data || {};
+      if (typeof d === 'string') {
+        try { d = JSON.parse(d); } catch (e) { d = {}; }
+      }
+      var toolData = d.data || {};
+      var isToolStart = toolData.phase === 'start' && toolData.name;
+      if (isToolStart) {
+        var agentId = (sessionKey || '').split(':')[1] || '';
+        _broadcastSubagentProgress(agentId, toolData.name);
+      }
+    }
   });
 
   console.log('[WS] Gateway WebSocket client initialized');
@@ -126,6 +154,7 @@ sessionSync.init(function (payload) { sseManager.broadcast(payload); });
 // ── 配置文件监听 ──────────────────────────────────────
 
 let _configWatchTimer = null;
+if (OPENCLAW_CONFIG) {
 try {
   fs.watch(OPENCLAW_CONFIG, function (eventType) {
     if (eventType !== 'change') return;
@@ -146,6 +175,7 @@ try {
 } catch (e) {
   console.warn('[Watch] Cannot watch openclaw.json:', e.message);
 }
+}
 
 // ── HTTP 工具函数 ─────────────────────────────────────
 
@@ -162,6 +192,7 @@ const MIME_TYPES = {
   '.ico': 'image/x-icon',
   '.woff': 'font/woff',
   '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
   '.md': 'text/markdown; charset=utf-8',
 };
 
@@ -211,7 +242,13 @@ function serveStatic(req, res) {
       res.end(err.code === 'ENOENT' ? 'Not found' : 'Internal error');
       return;
     }
-    res.writeHead(200, { 'Content-Type': contentType });
+    const NO_CACHE_EXTS = new Set(['.html', '.js', '.css', '.json']);
+    const headers = { 'Content-Type': contentType };
+    if (NO_CACHE_EXTS.has(ext)) {
+      headers['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+      headers['Pragma'] = 'no-cache';
+    }
+    res.writeHead(200, headers);
     res.end(data);
   });
 }
@@ -226,7 +263,7 @@ function serveStaticWithOverride(req, res, overridePath) {
       res.end('Setup page not found');
       return;
     }
-    res.writeHead(200, { 'Content-Type': contentType });
+    res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': 'no-cache, no-store, must-revalidate', 'Pragma': 'no-cache' });
     res.end(data);
   });
 }

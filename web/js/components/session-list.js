@@ -19,7 +19,7 @@ const SessionList = {
     if (av && typeof av === 'string' && av.indexOf('/') < 0 && av.indexOf('\\') < 0) {
       return av;
     }
-    return (a.name || a.id).slice(0,1);
+    return (a.displayName || a.name || a.id).slice(0, 1);
   },
 
   render: function () {
@@ -51,9 +51,8 @@ const SessionList = {
         + (s.agent ? ' data-agent="' + escapeHtml(s.agent) + '"' : '') + '>'
         + '<div class="info">'
         + '<div class="name">' + tagHtml
-        + (s.agent ? ('<span class="session-agent-badge" title="' + escapeHtml(s.agent) + ' 功手对话">' + escapeHtml(SessionList._getAgentLabel(s.agent)) + '</span>') : '')
+        + (s.agent ? ('<span class="session-agent-badge" title="' + escapeHtml(s.agent) + '">' + escapeHtml(SessionList._getAgentLabel(s.agent)) + '</span>') : '')
         + escapeHtml(s.name || '新对话') + '</div>'
-        + '<div class="meta">' + fmtDate(s.updated_at) + '</div>'
         + '</div>'
         + '<button class="menu-btn" data-menu="' + escapeHtml(s.id) + '" title="更多操作">⋯</button>'
         + '</div>';

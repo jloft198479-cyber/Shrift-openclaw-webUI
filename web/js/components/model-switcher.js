@@ -38,7 +38,7 @@ var ModelSwitcher = {
       var idx = agents.findIndex(function (a) { return a.id === agentId; });
       if (idx >= 0) {
         agents[idx] = Object.assign({}, agents[idx], { model: modelId });
-        State.setState({ agents: agents });
+        State.setState({ agents: normalizeAgents(agents) });
       }
     } else {
       Api.updateDefaultModel(modelId).catch(function (err) {

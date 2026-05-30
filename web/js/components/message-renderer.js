@@ -15,20 +15,6 @@ function _getAgentColor(name) {
 }
 
 /**
- * 根据 MIME 返回附件图标字符
- */
-function getAttachmentIcon(mimeType) {
-  if (!mimeType) return '📎';
-  if (mimeType.indexOf('image/') === 0) return '🖼';
-  if (mimeType.indexOf('pdf') >= 0) return '📄';
-  if (mimeType.indexOf('zip') >= 0 || mimeType.indexOf('rar') >= 0 || mimeType.indexOf('tar') >= 0 || mimeType.indexOf('7z') >= 0) return '📦';
-  if (mimeType.indexOf('text') >= 0 || mimeType.indexOf('javascript') >= 0 || mimeType.indexOf('json') >= 0 || mimeType.indexOf('xml') >= 0 || mimeType.indexOf('html') >= 0 || mimeType.indexOf('css') >= 0) return '📝';
-  if (mimeType.indexOf('sheet') >= 0 || mimeType.indexOf('excel') >= 0) return '📊';
-  if (mimeType.indexOf('word') >= 0 || mimeType.indexOf('document') >= 0) return '📃';
-  return '📎';
-}
-
-/**
  * 解析消息中的附件信息，返回 { text, attachments }
  * 附件格式：行首 🖼 或 📄 开头的行，如 "🖼 文件名.png" 或 "📄 文档.pdf"
  */
@@ -38,11 +24,10 @@ function getAttachmentIcon(mimeType) {
  */
 function _buildAgentLabelHtml(agent, resolvedAgentName) {
   var avatar = (agent && agent.avatar) || '';
-  var displayName = (agent && agent.name) || resolvedAgentName;
   var desc = (agent && agent.description) || '';
   var agentAvatar = renderAgentAvatar(avatar || (resolvedAgentName ? resolvedAgentName.slice(0, 1) : ''), resolvedAgentName);
   var html = '<span class="agent-label-avatar">' + agentAvatar + '</span>';
-  html += '<span class="agent-label-name">' + escapeHtml(displayName) + '</span>';
+  html += '<span class="agent-label-name">' + escapeHtml(resolvedAgentName) + '</span>';
   if (desc) {
     html += '<span class="agent-label-desc">' + escapeHtml(desc) + '</span>';
   }
@@ -91,6 +76,135 @@ function _buildAttachmentCards(attachments) {
   return '<div class="msg-attachments">' + cards + '</div>';
 }
 
+/**
+ * 构建消息 DOM 元素（私有方法，消除重复代码）
+ * @param {string} role - 'user' | 'assistant'
+ * @param {string} content - 消息文本
+ * @param {boolean} streaming - 是否流式
+ * @param {string} thinking - 思考内容
+ * @param {string} agentId - Agent ID
+ * @param {Array} [attachmentMeta] - 附件元数据
+ * @returns {HTMLElement} 消息 div
+ */
+function _buildMessageElement(role, content, streaming, thinking, agentId, attachmentMeta) {
+  const div = document.createElement('div');
+  div.className = 'message ' + role;
+
+  const resolvedAgentId = (agentId !== undefined && agentId !== '') ? agentId : ((role === 'assistant' && State.currentAgent) || '');
+  const agent = State.findAgent(resolvedAgentId);
+  const resolvedAgentName = (agent && agent.displayName) || (role === 'assistant' ? APP_NAME : resolvedAgentId);
+  if (resolvedAgentId) div.dataset.agentId = resolvedAgentId;
+
+  if (role === 'assistant') {
+    DebugTrace.log('buildMessageElement', { role: role, inputAgentId: agentId, resolvedAgentId: resolvedAgentId, resolvedAgentName: resolvedAgentName, currentAgent: State.currentAgent, interactionMode: State.interactionMode });
+  }
+
+  // ── 头像 ──
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  if (role === 'assistant' && resolvedAgentName) {
+    const av = (agent && agent.avatar) || '';
+    avatar.innerHTML = av ? renderAgentAvatar(av, resolvedAgentName) : '<img src="' + LOGO_SRC + '" alt="" class="avatar-logo-img">';
+    const ac = _getAgentColor(resolvedAgentName);
+    avatar.style.background = ac;
+    div.style.setProperty('--agent-color', ac);
+    div.classList.add('message-agent');
+  } else if (role === 'assistant') {
+    avatar.style.background = 'linear-gradient(135deg, var(--accent), var(--accent-hover))';
+    avatar.innerHTML = '<img src="' + LOGO_SRC + '" alt="" class="avatar-logo-img">';
+  } else {
+    avatar.textContent = '你';
+  }
+  div.appendChild(avatar);
+
+  // ── 气泡 ──
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+
+  // agent 标签
+  if (role === 'assistant' && resolvedAgentName) {
+    const label = document.createElement('div');
+    label.className = 'agent-label';
+    label.innerHTML = _buildAgentLabelHtml(agent, resolvedAgentName);
+    bubble.appendChild(label);
+  }
+
+  // 内容
+  if (streaming) {
+    bubble.classList.add('streaming-cursor');
+    const contentEl = document.createElement('div');
+    contentEl.className = 'agent-content';
+    bubble.appendChild(contentEl);
+  } else {
+    if (thinking) {
+      const tb = document.createElement('div');
+      tb.className = 'thinking-block';
+      tb.innerHTML = '<div class="thinking-toggle" onclick="this.nextElementSibling.classList.toggle(\'open\')">💭 已深度思考</div>'
+        + '<div class="thinking-content">' + escapeHtml(thinking) + '</div>';
+      bubble.appendChild(tb);
+    }
+
+    // 用户消息：解析附件并渲染卡片
+    if (role === 'user' && content) {
+      const parsed = _parseAttachments(content);
+      if (attachmentMeta && attachmentMeta.length > 0) {
+        if (parsed.text.trim()) {
+          const contentEl = document.createElement('div');
+          contentEl.className = 'agent-content';
+          contentEl.innerHTML = highlightMentions(parsed.text);
+          bubble.appendChild(contentEl);
+        }
+        const attContainer = document.createElement('div');
+        attContainer.className = 'msg-attachments';
+        for (let i = 0; i < attachmentMeta.length; i++) {
+          const att = attachmentMeta[i];
+          const icon = getAttachmentIcon(att.type);
+          const shortName = att.name.length > 20 ? att.name.slice(0, 18) + '…' : att.name;
+          const card = document.createElement('div');
+          card.className = 'msg-attachment-card';
+          card.innerHTML = '<span class="msg-att-icon">' + icon + '</span>'
+            + '<span class="msg-att-name" title="' + escapeHtml(att.name) + '">' + escapeHtml(shortName) + '</span>';
+          attContainer.appendChild(card);
+        }
+        bubble.appendChild(attContainer);
+      } else if (parsed.attachments.length > 0) {
+        if (parsed.text.trim()) {
+          const contentEl = document.createElement('div');
+          contentEl.className = 'agent-content';
+          contentEl.innerHTML = highlightMentions(parsed.text);
+          bubble.appendChild(contentEl);
+        }
+        bubble.insertAdjacentHTML('beforeend', _buildAttachmentCards(parsed.attachments));
+      } else {
+        const contentEl = document.createElement('div');
+        contentEl.className = 'agent-content';
+        contentEl.innerHTML = highlightMentions(content);
+        bubble.appendChild(contentEl);
+      }
+    } else if (content) {
+      const contentEl = document.createElement('div');
+      contentEl.className = 'agent-content';
+      if (role === 'assistant') {
+        contentEl.innerHTML = renderMarkdown(content);
+      } else {
+        contentEl.textContent = content;
+      }
+      bubble.appendChild(contentEl);
+    }
+  }
+
+  // ── 操作按钮（仅 assistant，流式结束后可见） ──
+  if (role === 'assistant' && !streaming) {
+    const actions = document.createElement('div');
+    actions.className = 'msg-actions';
+    actions.innerHTML = '<button class="msg-act-btn" data-action="copy" title="复制">📋</button>';
+    bubble.appendChild(actions);
+  }
+
+  div.appendChild(bubble);
+  return div;
+}
+
 const MessageRenderer = {
   _initialized: false,
 
@@ -115,25 +229,9 @@ const MessageRenderer = {
     if (!content) return;
     const text = content.innerText || content.textContent || '';
     if (!text) return;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(function () {
-        MessageRenderer._flashCopied(btn);
-      }).catch(function () {
-        MessageRenderer._fallbackCopy(text, btn);
-      });
-    } else {
-      MessageRenderer._fallbackCopy(text, btn);
-    }
-  },
-
-  _fallbackCopy: function (text, btn) {
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.cssText = 'position:fixed;left:-9999px';
-    document.body.appendChild(ta);
-    ta.select();
-    try { document.execCommand('copy'); this._flashCopied(btn); } catch (e) {}
-    document.body.removeChild(ta);
+    Utils.copyToClipboard(text, function () {
+      MessageRenderer._flashCopied(btn);
+    });
   },
 
   _flashCopied: function (btn) {
@@ -153,125 +251,10 @@ const MessageRenderer = {
    * @returns {HTMLElement|null} 消息 div
    */
   appendMessage: function (role, content, streaming, thinking, agentId, attachmentMeta) {
+    DebugTrace.log('appendMessage', { role: role, agentId: agentId, streaming: streaming, content: (content || '').substring(0, 60) });
     const inner = document.querySelector('.messages-inner');
     if (!inner) return null;
-
-    const div = document.createElement('div');
-    div.className = 'message ' + role;
-
-    const resolvedAgentId = (agentId !== undefined && agentId !== '') ? agentId : ((role === 'assistant' && State.currentAgent) || '');
-    const agent = State.findAgent(resolvedAgentId);
-    const resolvedAgentName = agent ? agent.name : resolvedAgentId;
-    if (resolvedAgentId) div.dataset.agentId = resolvedAgentId;
-
-    // ── 头像 ──
-    const avatar = document.createElement('div');
-    avatar.className = 'avatar';
-    if (role === 'assistant' && resolvedAgentName) {
-      const av = (agent && agent.avatar) || '';
-      avatar.innerHTML = av ? renderAgentAvatar(av, resolvedAgentName) : '<img src="' + LOGO_SRC + '" alt="" class="avatar-logo-img">';
-      const ac = _getAgentColor(resolvedAgentName);
-      avatar.style.background = ac;
-      div.style.setProperty('--agent-color', ac);
-      div.classList.add('message-agent');
-    } else if (role === 'assistant') {
-      avatar.style.background = 'linear-gradient(135deg, var(--accent), var(--accent-hover))';
-      avatar.innerHTML = '<img src="' + LOGO_SRC + '" alt="" class="avatar-logo-img">';
-    } else {
-      avatar.textContent = '你';
-    }
-    div.appendChild(avatar);
-
-    // ── 气泡 ──
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-
-    // agent 标签
-    if (role === 'assistant' && resolvedAgentName) {
-      const label = document.createElement('div');
-      label.className = 'agent-label';
-      label.innerHTML = _buildAgentLabelHtml(agent, resolvedAgentName);
-      bubble.appendChild(label);
-    }
-
-    // 内容
-    if (streaming) {
-      bubble.classList.add('streaming-cursor');
-      const contentEl = document.createElement('div');
-      contentEl.className = 'agent-content';
-      bubble.appendChild(contentEl);
-    } else {
-      if (thinking) {
-        const tb = document.createElement('div');
-        tb.className = 'thinking-block';
-        tb.innerHTML = '<div class="thinking-toggle" onclick="this.nextElementSibling.classList.toggle(\'open\')">💭 已深度思考</div>'
-          + '<div class="thinking-content">' + escapeHtml(thinking) + '</div>';
-        bubble.appendChild(tb);
-      }
-
-      // 用户消息：解析附件并渲染卡片
-      if (role === 'user' && content) {
-        const parsed = _parseAttachments(content);
-        // 如果传入了 attachmentMeta，优先使用它渲染更完整的卡片
-        if (attachmentMeta && attachmentMeta.length > 0) {
-          if (parsed.text.trim()) {
-            const contentEl = document.createElement('div');
-            contentEl.className = 'agent-content';
-            contentEl.textContent = parsed.text;
-            bubble.appendChild(contentEl);
-          }
-          const attContainer = document.createElement('div');
-          attContainer.className = 'msg-attachments';
-          for (let i = 0; i < attachmentMeta.length; i++) {
-            const att = attachmentMeta[i];
-            const icon = getAttachmentIcon(att.type);
-            const shortName = att.name.length > 20 ? att.name.slice(0, 18) + '…' : att.name;
-            const card = document.createElement('div');
-            card.className = 'msg-attachment-card';
-            card.innerHTML = '<span class="msg-att-icon">' + icon + '</span>'
-              + '<span class="msg-att-name" title="' + escapeHtml(att.name) + '">' + escapeHtml(shortName) + '</span>';
-            attContainer.appendChild(card);
-          }
-          bubble.appendChild(attContainer);
-        } else if (parsed.attachments.length > 0) {
-          // 兼容：从内容文本解析
-          if (parsed.text.trim()) {
-            const contentEl = document.createElement('div');
-            contentEl.className = 'agent-content';
-            contentEl.textContent = parsed.text;
-            bubble.appendChild(contentEl);
-          }
-          bubble.insertAdjacentHTML('beforeend', _buildAttachmentCards(parsed.attachments));
-        } else {
-          // 纯文本消息
-          const contentEl = document.createElement('div');
-          contentEl.className = 'agent-content';
-          contentEl.textContent = content;
-          bubble.appendChild(contentEl);
-        }
-      } else if (content) {
-        const contentEl = document.createElement('div');
-        contentEl.className = 'agent-content';
-        if (role === 'assistant') {
-          contentEl.innerHTML = renderMarkdown(content);
-        } else {
-          contentEl.textContent = content;
-        }
-        bubble.appendChild(contentEl);
-      }
-    }
-
-    // ── 操作按钮（仅 assistant，流式结束后可见） ──
-    if (role === 'assistant' && !streaming) {
-      const actions = document.createElement('div');
-      actions.className = 'msg-actions';
-      actions.innerHTML = '<button class="msg-act-btn" data-action="copy" title="复制">📋</button>'
-        + '<button class="msg-act-btn" data-action="regenerate" title="即将支持" disabled>🔄</button>'
-        + '<button class="msg-act-btn" data-action="delete" title="即将支持" disabled>🗑</button>';
-      bubble.appendChild(actions);
-    }
-
-    div.appendChild(bubble);
+    const div = _buildMessageElement(role, content, streaming, thinking, agentId, attachmentMeta);
     inner.appendChild(div);
     return div;
   },
@@ -303,9 +286,10 @@ const MessageRenderer = {
   },
 
   updateMessageAgent: function (messageEl, newAgentId) {
+    DebugTrace.log('updateMessageAgent', { newAgentId: newAgentId });
     if (!messageEl) return;
     const agent = State.findAgent(newAgentId);
-    const displayName = agent ? agent.name : newAgentId;
+    const displayName = (agent && agent.displayName) || APP_NAME;
     const av = (agent && agent.avatar) || '';
     const ac = _getAgentColor(displayName);
 
@@ -339,5 +323,34 @@ const MessageRenderer = {
         }
       }
     }
+  },
+
+  updateBubbleContent: function (bubble, newContent) {
+    if (!bubble) return;
+    var contentEl = bubble.querySelector('.agent-content');
+    if (contentEl) {
+      contentEl.innerHTML = renderMarkdown(newContent);
+    }
+    if (!bubble.querySelector('.msg-actions')) {
+      var actions = document.createElement('div');
+      actions.className = 'msg-actions';
+      actions.innerHTML = '<button class="msg-act-btn" data-action="copy" title="复制">📋</button>';
+      bubble.appendChild(actions);
+    }
+  },
+
+  /**
+   * 创建消息 DOM 元素（不追加到 DOM）
+   * 用于虚拟列表等场景
+   * @param {string} role - 'user' | 'assistant'
+   * @param {string} content - 消息文本
+   * @param {boolean} streaming - 是否流式
+   * @param {string} thinking - 思考内容
+   * @param {string} agentId - Agent ID
+   * @param {Array} [attachmentMeta] - 附件元数据
+   * @returns {HTMLElement|null} 消息 div
+   */
+  createMessageElement: function (role, content, streaming, thinking, agentId, attachmentMeta) {
+    return _buildMessageElement(role, content, streaming, thinking, agentId, attachmentMeta);
   },
 };

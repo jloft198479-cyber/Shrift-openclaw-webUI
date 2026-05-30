@@ -1,54 +1,30 @@
 /**
- * session-sync.js — Gateway session 文件轮询
+ * session-sync.js — 事件驱动的 session 文件同步
  *
- * 职责：轮询主 agent 的 session 文件，检测新消息并广播到前端。
+ * 职责：收到 Gateway WS 事件后，读取主 agent session 文件，检测新消息并广播到前端。
  *
  * 输出事件：
  *   announce-result    → 主 agent session 中的新 assistant 消息
- *     注意：当前包含所有新消息（含 SSE 流已渲染的重复），
- *     前端暂不处理此事件。启用前需过滤掉 SSE 流已渲染的消息。
  *   subagent-progress  → 子 agent 执行进度（正在调用的工具）
- *     前端暂不处理此事件，预留用于未来的进度卡片 UI。
  *
- * 触发条件：
- *   Gateway WS 事件（session.tool, sessions.changed 等）触发 startSync()
- *   之后每 5 秒轮询一次，连续 24 次无新消息则停止
+ * 触发方式：
+ *   Gateway WS 事件到达 → 延迟读一次文件 → 广播 → 结束
+ *   不轮询，不循环。
  */
 
 const fs = require('fs');
 const path = require('path');
+const debugTrace = require('./debug-trace');
 
 var _broadcastSSE = null;
-var _syncLoopTimer = null;
-var _syncLastCount = 0;
-var _syncIdleRounds = 0;
 var _syncFilePath = '';
 var _syncFileOffset = 0;
-var _syncParsedCount = 0;
-var SYNC_INTERVAL_MS = 5000;
-var SYNC_MAX_IDLE_ROUNDS = 6;
+var _retryTimer = null;
+var _retryCount = 0;
+var MAX_RETRIES = 2;
+var RETRY_DELAY_MS = 1000;
+var INITIAL_DELAY_MS = 500;
 var MAIN_AGENT_SESSIONS_SUBDIR = path.join('agents', 'main', 'sessions');
-var SUBAGENT_PROGRESS_MAX_AGE_MS = 300000;
-var _subagentDirsCache = null;
-var _subagentDirsCacheTime = 0;
-var SUBAGENT_DIRS_CACHE_TTL = 10000;
-
-function _hasActiveSubagentDirs() {
-  var now = Date.now();
-  if (_subagentDirsCache !== null && now - _subagentDirsCacheTime < SUBAGENT_DIRS_CACHE_TTL) {
-    return _subagentDirsCache;
-  }
-  try {
-    var stateDir = process.env.OPENCLAW_STATE_DIR;
-    if (!stateDir) { _subagentDirsCache = false; _subagentDirsCacheTime = now; return false; }
-    var agentsDir = path.join(stateDir, 'agents');
-    if (!fs.existsSync(agentsDir)) { _subagentDirsCache = false; _subagentDirsCacheTime = now; return false; }
-    var dirs = fs.readdirSync(agentsDir).filter(function (d) { return d !== 'main'; });
-    _subagentDirsCache = dirs.length > 0;
-    _subagentDirsCacheTime = now;
-    return _subagentDirsCache;
-  } catch (e) { _subagentDirsCache = false; _subagentDirsCacheTime = now; return false; }
-}
 
 function _logError(prefix, e) {
   if (e && e.message) console.error('[Sync] ' + prefix + ': ' + e.message);
@@ -58,65 +34,53 @@ function init(broadcastFn) {
   _broadcastSSE = broadcastFn;
 }
 
+var _lastAgentId = '';
+
 function onSubagentGatewayEvent(data) {
   try {
-    var inner = data.data || data;
-    var eventName = inner.event || '';
-    if (eventName === 'session.tool' || eventName === 'sessions.changed' || eventName === 'session.created' || eventName === 'session.updated') {
-      if (!_syncLoopTimer) startSync();
+    var eventName = data.event || '';
+    if ((eventName === 'session.tool' || eventName === 'agent') && data.payload) {
+      var sk = data.payload.sessionKey || '';
+      var parts = sk.split(':');
+      if (parts.length >= 2 && parts[1] !== 'main') {
+        var oldId = _lastAgentId;
+        _lastAgentId = parts[1];
+        debugTrace.trace('lastAgentId-change', { from: oldId, to: _lastAgentId, trigger: eventName, sessionKey: sk });
+      }
+    }
+    if (eventName === 'session.tool' || eventName === 'agent'
+        || eventName === 'sessions.changed' || eventName === 'session.created' || eventName === 'session.updated') {
+      _scheduleRead();
     }
   } catch (e) { _logError('gatewayEvent', e); }
 }
 
-var SYNC_LOOKBACK_BYTES = 16384;
-
-function startSync() {
-  if (_syncLoopTimer) return;
-  _syncIdleRounds = 0;
-  var targetFile = _findTargetFile();
-  if (targetFile) {
-    _syncFilePath = targetFile;
-    try {
-      var stat = fs.statSync(targetFile);
-      _syncFileOffset = Math.max(0, stat.size - SYNC_LOOKBACK_BYTES);
-    } catch (e) { _syncFileOffset = 0; }
-  } else {
-    _syncFilePath = '';
-    _syncFileOffset = 0;
-  }
-  _syncParsedCount = countGatewayAssistantMessages();
-  _syncLastCount = _syncParsedCount;
-  _syncLoopTimer = setInterval(doSync, SYNC_INTERVAL_MS);
-  console.log('[Sync] Loop started, baseline=' + _syncLastCount + ', offset=' + _syncFileOffset);
+function _scheduleRead() {
+  if (_retryTimer) return;
+  _retryCount = 0;
+  _retryTimer = setTimeout(function () {
+    _retryTimer = null;
+    _doRead();
+  }, INITIAL_DELAY_MS);
 }
 
-function doSync() {
+function _doRead() {
   var targetFile = _findTargetFile();
-  if (!targetFile) {
-    _syncIdleRounds++;
-    if (_syncIdleRounds >= SYNC_MAX_IDLE_ROUNDS) stopSync();
-    return;
-  }
+  if (!targetFile) return;
+
   if (targetFile !== _syncFilePath) {
     _syncFilePath = targetFile;
-    _syncFileOffset = 0;
-    _syncParsedCount = 0;
+    try {
+      _syncFileOffset = fs.statSync(targetFile).size;
+    } catch (e) { _syncFileOffset = 0; }
+    return;
   }
+
   var newMessages = [];
   try {
     var stat = fs.statSync(targetFile);
     if (stat.size <= _syncFileOffset) {
-      if (!_hasActiveSubagentDirs()) { stopSync(); return; }
-      var prog = _readSubagentProgress();
-      if (prog && Object.keys(prog).length > 0) {
-        _syncIdleRounds = 0;
-        if (_broadcastSSE) {
-          _broadcastSSE({ type: 'subagent-progress', progress: prog });
-        }
-      } else {
-        _syncIdleRounds++;
-        if (_syncIdleRounds >= SYNC_MAX_IDLE_ROUNDS) stopSync();
-      }
+      _maybeRetry();
       return;
     }
     var readSize = stat.size - _syncFileOffset;
@@ -128,52 +92,72 @@ function doSync() {
       fs.closeSync(fd);
     }
     _syncFileOffset = stat.size;
-    var chunk = buf.toString('utf8');
-    var parsed = _parseAssistantMessages(chunk);
-    newMessages = parsed.messages;
-  } catch (e) { _logError('incrementalRead', e); }
-  _syncParsedCount += newMessages.length;
-  var progress = null;
-  if (_hasActiveSubagentDirs()) {
-    progress = _readSubagentProgress();
-  }
-  var hasProgress = progress && Object.keys(progress).length > 0;
-  if (newMessages.length === 0) {
-    if (hasProgress) {
-      _syncIdleRounds = 0;
-      if (_broadcastSSE) {
-        _broadcastSSE({ type: 'subagent-progress', progress: progress });
-      }
-    } else {
-      _syncIdleRounds++;
-      if (_syncIdleRounds >= SYNC_MAX_IDLE_ROUNDS) stopSync();
+    newMessages = _parseAssistantMessages(buf.toString('utf8')).messages;
+  } catch (e) { _logError('read', e); }
+
+  if (newMessages.length > 0) {
+    debugTrace.trace('announce-result-broadcast', { agentId: _lastAgentId, msgCount: newMessages.length, lastMsgPreview: (newMessages[newMessages.length - 1].content || '').substring(0, 100) });
+    if (_broadcastSSE) {
+      _broadcastSSE({ type: 'announce-result', messages: newMessages, agentId: _lastAgentId });
     }
-    return;
+    _lastAgentId = '';
+  } else {
+    _maybeRetry();
   }
-  _syncIdleRounds = 0;
-  if (_broadcastSSE) {
-    _broadcastSSE({ type: 'announce-result', messages: newMessages, total: _syncParsedCount, progress: progress });
+}
+
+function _maybeRetry() {
+  if (_retryCount < MAX_RETRIES) {
+    _retryCount++;
+    _retryTimer = setTimeout(function () {
+      _retryTimer = null;
+      _doRead();
+    }, RETRY_DELAY_MS);
   }
-  _syncLastCount = _syncParsedCount;
 }
 
 function stopSync() {
-  if (_syncLoopTimer) {
-    clearInterval(_syncLoopTimer);
-    _syncLoopTimer = null;
-    _syncLastCount = 0;
-    _syncIdleRounds = 0;
-    _syncFilePath = '';
-    _syncFileOffset = 0;
-    _syncParsedCount = 0;
-    _subagentDirsCache = null;
-    _subagentDirsCacheTime = 0;
-    console.log('[Sync] Loop stopped');
+  if (_retryTimer) {
+    clearTimeout(_retryTimer);
+    _retryTimer = null;
   }
+  _syncFilePath = '';
+  _syncFileOffset = 0;
+  _retryCount = 0;
+  console.log('[Sync] Stopped');
 }
 
-function countGatewayAssistantMessages() {
-  return readGatewayAssistantMessages().length;
+function _isHeartbeatSession(filePath) {
+  try {
+    var fd = fs.openSync(filePath, 'r');
+    var headBuf = Buffer.alloc(Math.min(4096, fs.fstatSync(fd).size));
+    fs.readSync(fd, headBuf, 0, headBuf.length, 0);
+    fs.closeSync(fd);
+    var head = headBuf.toString('utf8');
+    var lines = head.split('\n').filter(function (l) { return l.trim(); });
+    var checkedCount = 0;
+    for (var i = 0; i < lines.length && checkedCount < 5; i++) {
+      try {
+        var item = JSON.parse(lines[i]);
+        checkedCount++;
+        if (item.sessionKey && item.sessionKey.indexOf('heartbeat') >= 0) return true;
+        if (item.type === 'message' && item.message && item.message.content) {
+          var content = item.message.content;
+          if (Array.isArray(content)) {
+            var allHeartbeat = content.length > 0;
+            for (var c = 0; c < content.length; c++) {
+              if (!content[c] || (content[c].text !== 'HEARTBEAT_OK' && content[c].text !== 'heartbeat')) {
+                allHeartbeat = false;
+                break;
+              }
+            }
+            if (allHeartbeat) return true;
+          }
+        }
+      } catch (e) {}
+    }
+    return false;
+  } catch (e) { return false; }
 }
 
 function _findTargetFile() {
@@ -193,14 +177,9 @@ function _findTargetFile() {
     for (var fi = 0; fi < files.length; fi++) {
       var fp = path.join(sessionsDir, files[fi]);
       try {
-        var fd = fs.openSync(fp, 'r');
-        var headBuf = Buffer.alloc(Math.min(4096, fs.fstatSync(fd).size));
-        fs.readSync(fd, headBuf, 0, headBuf.length, 0);
-        fs.closeSync(fd);
-        var head = headBuf.toString('utf8');
-        if (head.indexOf('heartbeat') >= 0 && head.indexOf('HEARTBEAT') >= 0 && head.indexOf('agent-mp') < 0 && head.indexOf('agent:main') < 0) continue;
+        if (_isHeartbeatSession(fp)) continue;
         return fp;
-      } catch (e) { _logError('findTargetHead', e); }
+      } catch (e) { _logError('findTarget', e); }
     }
     return path.join(sessionsDir, files[0]);
   } catch (e) { _logError('findTarget', e); return null; }
@@ -240,65 +219,10 @@ function readGatewayAssistantMessages() {
   } catch (e) { _logError('readMessages', e); return []; }
 }
 
-function _readSubagentProgress() {
-  var progress = {};
-  try {
-    var stateDir = process.env.OPENCLAW_STATE_DIR;
-    if (!stateDir) return progress;
-    var agentsDir = path.join(stateDir, 'agents');
-    if (!fs.existsSync(agentsDir)) return progress;
-    var agentDirs = fs.readdirSync(agentsDir);
-    for (var ai = 0; ai < agentDirs.length; ai++) {
-      var agentId = agentDirs[ai];
-      if (agentId === 'main') continue;
-      var sessionsDir = path.join(agentsDir, agentId, 'sessions');
-      if (!fs.existsSync(sessionsDir)) continue;
-      var files = fs.readdirSync(sessionsDir).filter(function (f) { return f.endsWith('.jsonl') && f.indexOf('trajectory') < 0; });
-      if (files.length === 0) continue;
-      files.sort(function (a, b) {
-        var ta = 0, tb = 0;
-        try { ta = fs.statSync(path.join(sessionsDir, a)).mtimeMs; } catch (e) {}
-        try { tb = fs.statSync(path.join(sessionsDir, b)).mtimeMs; } catch (e) {}
-        return tb - ta;
-      });
-      var fp = path.join(sessionsDir, files[0]);
-      try {
-        var stat = fs.statSync(fp);
-        if (Date.now() - stat.mtimeMs > SUBAGENT_PROGRESS_MAX_AGE_MS) continue;
-      } catch (e) { continue; }
-      var raw = fs.readFileSync(fp, 'utf8');
-      var lines = raw.split('\n').filter(function (l) { return l.trim(); });
-      var lastTool = '';
-      for (var k = lines.length - 1; k >= 0; k--) {
-        try {
-          var item = JSON.parse(lines[k]);
-          if (item.type === 'message' && item.message && item.message.content) {
-            var content = item.message.content;
-            if (Array.isArray(content)) {
-              for (var c = content.length - 1; c >= 0; c--) {
-                if (content[c] && content[c].type === 'toolCall' && content[c].name) {
-                  lastTool = content[c].name;
-                  break;
-                }
-              }
-            }
-            if (lastTool) break;
-          }
-        } catch (e) { _logError('progressParseLine', e); }
-      }
-      if (lastTool) {
-        progress[agentId] = { toolName: lastTool };
-      }
-    }
-  } catch (e) { _logError('readProgress', e); }
-  return progress;
-}
-
 module.exports = {
   init: init,
   onSubagentGatewayEvent: onSubagentGatewayEvent,
-  startSync: startSync,
+  startSync: _scheduleRead,
   stopSync: stopSync,
   readGatewayAssistantMessages: readGatewayAssistantMessages,
-  countGatewayAssistantMessages: countGatewayAssistantMessages,
 };

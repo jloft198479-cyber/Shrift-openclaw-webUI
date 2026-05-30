@@ -2,6 +2,8 @@
 
 > 本文档是项目所有工作的最高准则。任何 AI 助手、任何开发者、任何会话，必须遵守以下原则。
 > 违反其中任何一条，都视为工作不合格。
+>
+> **每次会话必须同时读取 `product-context.md`，了解产品基本情况，避免重复解释。**
 
 ---
 
@@ -110,6 +112,13 @@
 - 先搭架子，再填内容
 - 拆分优于堆砌
 
+### 资源节约原则
+- **产品设计要替用户节约资源**——省 token、省内存、省 CPU、省算力
+- 功能完成 ≠ 任务完成，资源消耗也是质量指标
+- 堆砌代码 = 浪费用户资源 = 工作不合格
+- 重复逻辑必须合并，双重处理必须消除
+- 代码简洁不是风格偏好，是对用户资源的尊重
+
 ### 绝不硬编码
 - **绝不硬编码**——除非万不得已，否则任何数据、配置、路径、命令、技能列表都不允许写死在代码或文档中
 - 所有动态内容必须从单一数据源派生，禁止在 AGENTS.md、system prompt、代码中硬编码技能命令、agent 列表、搜索工具等
@@ -184,6 +193,23 @@ D:\nodejs\node.exe F:\fzz-Project\openclaw-web-ui\server.js
 - 必须给 try-catch 包裹所有异步回调和 session 操作
 - 修改 `State.setState` 的字段必须检查 5 个引用文件
 - `chat-view.js` 是核心但也是最脆弱的——570 行，改之前先画依赖图
+
+### ⛔ 冻结区域：会话框 UI
+
+**用户已确认，会话框（聊天区域）的 UI 设计冻结，不再修改。**
+
+冻结范围（以下文件的会话渲染相关样式和逻辑）：
+- `web/css/style.css` — `.message`、`.bubble`、`.avatar`、`.agent-label`、`.msg-actions`、`.streaming-cursor`、`.mention-chip` 等会话区域样式
+- `web/js/components/message-renderer.js` — 消息气泡渲染
+- `web/js/components/stream-renderer.js` — 流式渲染
+- `web/js/components/chat-view.js` — 聊天视图
+- `web/js/components/message-builder.js` — 消息构建
+- `web/js/utils/render.js` — `normalizeAgents`、`highlightMentions`、`renderAgentAvatar` 等渲染工具
+- `web/js/ui/mention-completer.js` — @提及功能
+
+备份位置：`F:\fzz-Project\openclaw-web-ui\_backup-会话UI设计\`
+
+如需修改以上文件，必须先与用户确认。
 
 ---
 

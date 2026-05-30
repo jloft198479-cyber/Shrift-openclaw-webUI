@@ -3,33 +3,7 @@ const http = require('http');
 function createProxy(gwHost, gwPort, gwToken, store) {
   function proxyRequest(req, res, raw) {
     const parsed = new URL(req.url, 'http://localhost');
-    const agentId = req.headers['x-openclaw-agent-id'];
-    let bodyToForward = raw;
-    if (agentId && (req.method === 'POST' || req.method === 'PUT') && raw && raw.length > 0) {
-      try {
-        const body = JSON.parse(raw.toString('utf8'));
-        if (body && body.messages && Array.isArray(body.messages)) {
-          const ws = store.getAgentWorkspace(agentId);
-          if (ws) {
-            const fs = require('fs');
-            const agentsMdPath = require('path').join(ws, 'AGENTS.md');
-            if (fs.existsSync(agentsMdPath)) {
-              const agentsMdContent = fs.readFileSync(agentsMdPath, 'utf8');
-              const hasSystemMsg = body.messages.length > 0 && body.messages[0].role === 'system';
-              if (hasSystemMsg) {
-                body.messages[0].content = agentsMdContent + '\n\n' + body.messages[0].content;
-              } else {
-                body.messages.unshift({ role: 'system', content: agentsMdContent });
-              }
-              bodyToForward = Buffer.from(JSON.stringify(body), 'utf8');
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[Proxy] Failed to inject AGENTS.md:', e.message);
-      }
-    }
-    _forwardRequest(req, res, bodyToForward, parsed);
+    _forwardRequest(req, res, raw, parsed);
   }
 
   function _forwardRequest(req, res, raw, parsed) {

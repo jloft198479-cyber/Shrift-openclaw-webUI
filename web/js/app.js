@@ -42,22 +42,22 @@ async function init() {
     await Api.fetchModels();
   } catch (e) {}
 
-  SessionManager.loadSessions();
+  SessionManager.loadSessions().then(function () {
+    const lastSessionId = localStorage.getItem('lastSessionId') || '';
 
-  const lastSessionId = localStorage.getItem('lastSessionId') || '';
-
-  if (lastSessionId) {
-    let sessionExists = false;
-    for (let j = 0; j < State.sessions.length; j++) {
-      if (State.sessions[j].id === lastSessionId) { sessionExists = true; break; }
+    if (lastSessionId) {
+      let sessionExists = false;
+      for (let j = 0; j < State.sessions.length; j++) {
+        if (State.sessions[j].id === lastSessionId) { sessionExists = true; break; }
+      }
+      if (sessionExists) {
+        SessionManager.selectSession(lastSessionId);
+        return;
+      }
     }
-    if (sessionExists) {
-      SessionManager.selectSession(lastSessionId);
-      return;
-    }
-  }
 
-  ChatView.showWelcome();
+    ChatView.showWelcome();
+  });
 }
 
 init().catch(function (e) {

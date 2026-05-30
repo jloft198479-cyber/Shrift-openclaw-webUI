@@ -14,7 +14,7 @@ var WelcomeView = {
     if (opts && opts.agent) {
       var agent = opts.agent;
       var icon = agent.avatar || '🤖';
-      var displayName = agent.name || '';
+      var displayName = agent.displayName || agent.name || '';
       var desc = agent.description || '输入你的需求，该助手将为你处理';
       welcome.innerHTML = '<div class="welcome-logo" style="font-size:32px;line-height:1">' + renderAgentAvatar(icon, displayName) + '</div>'
         + '<h2>与 ' + escapeHtml(displayName) + ' 对话</h2>'
@@ -23,9 +23,34 @@ var WelcomeView = {
       var exitLink = document.getElementById('exit-agent-link');
       if (exitLink) exitLink.addEventListener('click', function (e) { e.preventDefault(); SessionManager.exitAgentMode(); });
     } else {
+      var suggestions = [
+        { text: '帮我总结这篇文章的核心观点', icon: '📋' },
+        { text: '写一段代码解决这个需求', icon: '💻' },
+        { text: '解释一下这个概念', icon: '💡' }
+      ];
+      var chipsHtml = '<div class="welcome-suggestions">';
+      suggestions.forEach(function (s) {
+        chipsHtml += '<span class="welcome-suggestion" data-prompt="' + escapeHtml(s.text) + '">' + escapeHtml(s.icon) + ' ' + escapeHtml(s.text) + '</span>';
+      });
+      chipsHtml += '</div>';
       welcome.innerHTML = '<div class="welcome-logo" style="font-size:0;line-height:1"><img src="' + LOGO_SRC + '" alt="" style="width:auto;height:48px"></div>'
         + '<h2>开始新对话</h2>'
-        + '<p>在下方输入你的问题，与 ' + APP_NAME + ' 助理展开交流</p>';
+        + '<p>在下方输入你的问题，与 ' + APP_NAME + ' 助理展开交流</p>'
+        + chipsHtml;
+      welcome.querySelectorAll('.welcome-suggestion').forEach(function (el) {
+        el.addEventListener('click', function () {
+          var prompt = this.getAttribute('data-prompt');
+          if (!prompt) return;
+          var input = document.getElementById('input');
+          if (!input) return;
+          input.value = prompt;
+          input.focus();
+          input.dispatchEvent(new Event('input', { bubbles: true }));
+          if (typeof ChatView !== 'undefined' && ChatView.sendMessage) {
+            ChatView.sendMessage();
+          }
+        });
+      });
     }
   },
 
@@ -51,7 +76,7 @@ var WelcomeView = {
 
     var agent = State.findAgent(State.currentAgent);
     var avatar = (agent && agent.avatar) || '🤖';
-    var displayName = (agent && agent.name) || State.currentAgent;
+    var displayName = (agent && agent.displayName) || (agent && agent.name) || State.currentAgent;
 
     var bar = document.createElement('div');
     bar.id = 'agent-mode-bar';

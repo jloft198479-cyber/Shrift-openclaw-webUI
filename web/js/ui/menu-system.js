@@ -62,7 +62,7 @@ function toggleAgentMenu(btn) {
   if (!agentId) return;
 
   const agent = State.findAgent(agentId);
-  const displayName = agent ? agent.name : agentId;
+  const displayName = agent ? (agent.displayName || agent.name) : agentId;
 
   const dd = document.createElement('div');
   dd.className = 'agent-dropdown open';

@@ -1,12 +1,14 @@
 node_modules/
-_backup/
+_backup*/
 uploads/
 sessions/
 config.json
 *.tmp
 tmp-*
+*.log
 comprehensive-test.js
 simple-test.js
 test-mention.js
 SESSION_RECORD.md
 .workbuddy/
+trae-screenshot.png

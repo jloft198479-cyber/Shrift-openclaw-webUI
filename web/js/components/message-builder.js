@@ -11,7 +11,7 @@ var MessageBuilder = {
     var apiMessages = chatMessages.map(function (m) {
       if (m.role === 'assistant' && m.agentId && m.agentId !== targetAgentId) {
         var srcAgent = State.findAgent(m.agentId);
-        var srcName = srcAgent ? srcAgent.name : m.agentId;
+        var srcName = srcAgent ? (srcAgent.displayName || srcAgent.name) : m.agentId;
         return { role: 'assistant', content: '[' + srcName + ' said]: ' + m.content };
       }
 

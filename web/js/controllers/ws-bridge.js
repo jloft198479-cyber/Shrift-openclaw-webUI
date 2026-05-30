@@ -13,13 +13,13 @@
  *   status     → 连接状态（ws: connected/disconnected）
  *   agents-updated → Agent 列表变更通知
  *
- * 预留通道（暂不渲染）：
- *   announce-result → 智能调度模式下子 agent 的 announce 结果
- *     当前 SSE 流已包含主 agent 的完整响应（含 announce 后续），
- *     此通道预留用于：SSE 流中断后的恢复、子 agent 进度展示。
- *     启用前需重构 session-sync.js，过滤掉 SSE 流已渲染的消息。
- *   subagent-progress → 子 agent 执行进度（正在调用的工具）
- *     预留用于未来的子 agent 进度卡片 UI。
+ Announce 通道（智能调度结果回传）：
+ *   announce-result → 主 Agent 合成子 Agent 结果后的新回复
+ *     SSE 流在 spawn 后结束 [DONE]，子 Agent 结果通过 Announce 机制
+ *     异步回传到主 Agent session，session-sync.js 事件驱动检测后广播此事件。
+ *     前端收到后渲染为新的 assistant 消息气泡。
+ *   subagent-progress → 子 Agent 执行进度（正在调用的工具）
+ *     显示子 Agent 正在执行的工具，提供执行流程可视化。
  */
 
 var WsBridge = {
@@ -27,6 +27,9 @@ var WsBridge = {
   _reconnectTimer: null,
   _connected: false,
   _listeners: {},
+  _retryCount: 0,
+  _maxRetryDelay: 30000,  // 最大重连延迟 30 秒
+  _baseDelay: 3000,       // 基础延迟 3 秒
 
   init: function () {
     this.connect();
@@ -43,6 +46,7 @@ var WsBridge = {
     this._source.onopen = function () {
       console.log('[WsBridge] SSE connected');
       self._connected = true;
+      self._retryCount = 0;  // 连接成功，重置重试计数
       State.setState({ connected: true });
       if (typeof Api !== 'undefined') {
         if (Api.fetchAgents) Api.fetchAgents();
@@ -55,12 +59,7 @@ var WsBridge = {
       self._connected = false;
       self._source.close();
       self._source = null;
-      if (!self._reconnectTimer) {
-        self._reconnectTimer = setTimeout(function () {
-          self._reconnectTimer = null;
-          self.connect();
-        }, 3000);
-      }
+      self._scheduleReconnect();
     };
 
     this._source.addEventListener('gateway', function (e) {
@@ -94,10 +93,54 @@ var WsBridge = {
     });
 
     this._source.addEventListener('announce-result', function (e) {
+      try {
+        var data = JSON.parse(e.data);
+        DebugTrace.log('ws-bridge-announce-result', { agentId: data.agentId || '', msgCount: data.messages ? data.messages.length : 0 });
+        if (data.messages && data.messages.length > 0 && typeof ChatController !== 'undefined' && ChatController.handleAnnounceResult) {
+          ChatController.handleAnnounceResult(data.messages, data.agentId || '');
+        }
+      } catch (err) { console.error('[WsBridge] announce-result error:', err); }
     });
 
     this._source.addEventListener('subagent-progress', function (e) {
+      try {
+        var data = JSON.parse(e.data);
+        DebugTrace.log('ws-bridge-subagent-progress', { progress: data.progress });
+        if (data.progress && typeof ChatController !== 'undefined' && ChatController.handleSubagentProgress) {
+          ChatController.handleSubagentProgress(data.progress);
+        }
+      } catch (err) { console.error('[WsBridge] subagent-progress error:', err); }
     });
+  },
+
+  /**
+   * 调度重连（指数退避）
+   *
+   * 策略：
+   *   第 1 次：3 秒后重连
+   *   第 2 次：6 秒后重连（3 × 2）
+   *   第 3 次：12 秒后重连（6 × 2）
+   *   第 4 次：24 秒后重连（12 × 2）
+   *   ...最多 30 秒
+   *
+   * @private
+   */
+  _scheduleReconnect: function () {
+    if (this._reconnectTimer) return;
+
+    var delay = Math.min(
+      this._baseDelay * Math.pow(2, this._retryCount),
+      this._maxRetryDelay
+    );
+    this._retryCount++;
+
+    console.log('[WsBridge] Reconnecting in ' + (delay / 1000) + 's (attempt ' + this._retryCount + ')');
+
+    var self = this;
+    this._reconnectTimer = setTimeout(function () {
+      self._reconnectTimer = null;
+      self.connect();
+    }, delay);
   },
 
   _handleGatewayEvent: function (data) {
@@ -140,6 +183,7 @@ var WsBridge = {
       this._source = null;
     }
     this._connected = false;
+    this._retryCount = 0;
     this._listeners = {};
   },
 

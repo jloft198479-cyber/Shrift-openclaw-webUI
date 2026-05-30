@@ -17,6 +17,7 @@ const path = require('path');
 const store = require('./fs-store');
 const agentRoutes = require('./agent-routes');
 const sessionSync = require('./session-sync');
+const debugTrace = require('./debug-trace');
 
 const UPLOAD_ALLOWED_EXT = {
   '.png': 1, '.jpg': 1, '.jpeg': 1, '.gif': 1, '.svg': 1, '.webp': 1,
@@ -230,6 +231,9 @@ module.exports = {
       { method: 'PUT',    pattern: /^\/api\/sessions\/([^\/]+)$/,          handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } handleSessionSave(b, res); }); } },
       { method: 'DELETE', pattern: /^\/api\/sessions\/([^\/]+)$/,          handler: function (m, req, res) { handleSessionDelete(decodeURIComponent(m[1]), res); } },
       { method: 'GET',    pattern: /^\/api\/sessions\/([^\/]+)\/sync$/,    handler: function (m, req, res) { handleSessionSync(decodeURIComponent(m[1]), req, res); } },
+      { method: 'POST',   pattern: /^\/api\/log$/,                         handler: function (m, req, res) { debugTrace.handlePostLog(req, res, collectBody); } },
+      { method: 'GET',    pattern: /^\/api\/logs$/,                        handler: function (m, req, res) { debugTrace.handleGetLogs(req, res); } },
+      { method: 'POST',   pattern: /^\/api\/logs\/clear$/,                 handler: function (m, req, res) { debugTrace.handleClearLogs(req, res); } },
     ];
 
     return {

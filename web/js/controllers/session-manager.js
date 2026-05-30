@@ -33,7 +33,34 @@ const SessionStore = {
     this._cache[session.id] = session;
     try {
       localStorage.setItem('openclaw_session_' + session.id, JSON.stringify(session));
-    } catch (e) {}
+    } catch (e) {
+      if (e.name === 'QuotaExceededError' || e.code === 22) {
+        this._evictOldSessions();
+        try {
+          localStorage.setItem('openclaw_session_' + session.id, JSON.stringify(session));
+        } catch (e2) {}
+      }
+    }
+  },
+
+  _evictOldSessions: function () {
+    var keys = [];
+    for (var i = 0; i < localStorage.length; i++) {
+      var key = localStorage.key(i);
+      if (key && key.indexOf('openclaw_session_') === 0) {
+        try {
+          var data = JSON.parse(localStorage.getItem(key));
+          keys.push({ key: key, updatedAt: data.updatedAt || 0 });
+        } catch (e) {
+          keys.push({ key: key, updatedAt: 0 });
+        }
+      }
+    }
+    keys.sort(function (a, b) { return a.updatedAt - b.updatedAt; });
+    var toRemove = Math.max(1, Math.floor(keys.length / 4));
+    for (var j = 0; j < toRemove && j < keys.length; j++) {
+      localStorage.removeItem(keys[j].key);
+    }
   },
 
   _removeLocalCache: function (id) {
@@ -58,10 +85,13 @@ const SessionStore = {
   remove: function (id) {
     if (!id) return;
     this._removeLocalCache(id);
-    fetch('/api/sessions/' + id, { method: 'DELETE' }).catch(function (e) {
-      console.warn('[SessionStore] Server delete failed:', e.message);
-    });
-    this._refreshList();
+    var self = this;
+    fetch('/api/sessions/' + id, { method: 'DELETE' })
+      .then(function () { self._refreshList(); })
+      .catch(function (e) {
+        console.warn('[SessionStore] Server delete failed:', e.message);
+        self._refreshList();
+      });
   },
 
   rename: function (id, name) {
@@ -252,7 +282,7 @@ const SessionManager = {
       let who = msg.role === 'user' ? '**你**' : ('**' + APP_NAME + '**');
       if (msg.role === 'assistant' && msg.agentId) {
         const agent = State.findAgent(msg.agentId);
-        who = '**' + (agent ? agent.name : msg.agentId) + '**';
+        who = '**' + (agent ? (agent.displayName || agent.name) : msg.agentId) + '**';
       }
       lines.push('### ' + who, '', msg.content || '', '');
     });
@@ -266,7 +296,7 @@ const SessionManager = {
   },
 
   loadSessions: function () {
-    SessionStore.fetchFromServer().then(function (list) {
+    return SessionStore.fetchFromServer().then(function (list) {
       State.setState({ sessions: list });
     }).catch(function (e) {
       console.error('[SessionManager] loadSessions failed:', e);

@@ -27,24 +27,15 @@ const AgentList = {
     }
 
     list.innerHTML = visibleAgents.map(function (a) {
-      const iconHtml = renderAgentAvatar(a.avatar || '🤖', a.name || a.id);
-      const displayName = a.name || a.id;
+      const iconHtml = renderAgentAvatar(a.avatar || '🤖', a.displayName || a.name || a.id);
+      const displayName = a.displayName || a.name || a.id;
       const desc = a.description ? '<span class="agent-meta">' + escapeHtml(a.description) + '</span>' : '';
       const isActive = a.id === State.currentAgent;
-      let skillTags = '';
-      if (a.skills && a.skills.length > 0) {
-        skillTags = '<span class="agent-meta">';
-        for (let i = 0; i < a.skills.length; i++) {
-          skillTags += '<span class="skill-tag">' + escapeHtml(a.skills[i].icon || '') + ' ' + escapeHtml(a.skills[i].name || a.skills[i].id) + '</span>';
-        }
-        skillTags += '</span>';
-      }
       return '<div class="agent-item' + (isActive ? ' active' : '') + '" data-agent="' + escapeHtml(a.id) + '">'
         + '<span class="agent-icon">' + iconHtml + '</span>'
         + '<div class="agent-info">'
         + '<span class="agent-name">' + escapeHtml(displayName) + '</span>'
         + desc
-        + skillTags
         + '</div>'
         + '<button class="agent-menu-btn" data-agent="' + escapeHtml(a.id) + '" title="操作">⋮</button>'
         + '</div>';
