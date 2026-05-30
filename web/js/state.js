@@ -30,6 +30,7 @@ const State = {
     userScrolledUp: false,
     messages: [],
     currentSessionId: null,
+    dispatching: false,
   },
 
   /** Agent 相关状态 */
@@ -119,6 +120,7 @@ const State = {
       'chat.userScrolledUp': 'scroll',
       'chat.messages': 'messages',
       'chat.currentSessionId': 'session-switch',
+      'chat.dispatching': 'dispatching',
       // Agent 组
       'agent.agents': 'agent-list',
       'agent.skills': 'skills',
@@ -146,6 +148,7 @@ const State = {
       messages: 'messages',
       connected: 'connection',
       streaming: 'streaming',
+      dispatching: 'dispatching',
       userScrolledUp: 'scroll',
       activeModal: 'modal',
       editingAgent: 'modal',
@@ -156,6 +159,7 @@ const State = {
     const flatToGroup = {
       currentSessionId: 'chat.currentSessionId',
       streaming: 'chat.streaming',
+      dispatching: 'chat.dispatching',
       userScrolledUp: 'chat.userScrolledUp',
       messages: 'chat.messages',
       currentAgent: 'agent.currentAgent',
@@ -240,6 +244,9 @@ const State = {
 
   get streaming() { return this.chat.streaming; },
   set streaming(val) { this.chat.streaming = val; },
+
+  get dispatching() { return this.chat.dispatching; },
+  set dispatching(val) { this.chat.dispatching = val; },
 
   get connected() { return this.connection.connected; },
   set connected(val) { this.connection.connected = val; },

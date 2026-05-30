@@ -339,6 +339,108 @@ const MessageRenderer = {
     }
   },
 
+  appendToLastAssistantMessage: function (content, agentId) {
+    const inner = document.querySelector('.messages-inner');
+    if (!inner) return false;
+    const messages = inner.querySelectorAll('.message.assistant');
+    if (messages.length === 0) return false;
+    const lastMsg = messages[messages.length - 1];
+    const bubble = lastMsg.querySelector('.bubble');
+    if (!bubble) return false;
+
+    const resolvedAgentId = agentId || 'main';
+    const agent = State.findAgent(resolvedAgentId);
+    const displayName = (agent && agent.displayName) || APP_NAME;
+
+    const separator = document.createElement('div');
+    separator.className = 'bubble-separator';
+
+    const block = document.createElement('div');
+    block.className = 'bubble-content-block';
+    block.dataset.agentId = resolvedAgentId;
+
+    const label = document.createElement('div');
+    label.className = 'agent-label';
+    label.innerHTML = _buildAgentLabelHtml(agent, displayName);
+    block.appendChild(label);
+
+    const contentEl = document.createElement('div');
+    contentEl.className = 'agent-content';
+    contentEl.innerHTML = renderMarkdown(content);
+    block.appendChild(contentEl);
+
+    const actions = bubble.querySelector('.msg-actions');
+    if (actions) {
+      bubble.insertBefore(separator, actions);
+      bubble.insertBefore(block, actions);
+    } else {
+      bubble.appendChild(separator);
+      bubble.appendChild(block);
+    }
+
+    return true;
+  },
+
+  addProgressBlock: function (agentId, agentName, toolName) {
+    const inner = document.querySelector('.messages-inner');
+    if (!inner) return null;
+    const messages = inner.querySelectorAll('.message.assistant');
+    if (messages.length === 0) return null;
+    const lastMsg = messages[messages.length - 1];
+    const bubble = lastMsg.querySelector('.bubble');
+    if (!bubble) return null;
+
+    const el = document.createElement('div');
+    el.className = 'bubble-progress';
+    el.dataset.agentId = agentId;
+    el.innerHTML = '<span class="bubble-progress-spinner"></span>'
+      + '<span class="bubble-progress-name">' + escapeHtml(agentName) + '</span>'
+      + '<span class="bubble-progress-label">正在执行</span>'
+      + (toolName ? '<span class="bubble-progress-tool">' + escapeHtml(toolName) + '</span>' : '');
+
+    const actions = bubble.querySelector('.msg-actions');
+    if (actions) {
+      bubble.insertBefore(el, actions);
+    } else {
+      bubble.appendChild(el);
+    }
+
+    return el;
+  },
+
+  updateProgressBlock: function (agentId, status, toolName) {
+    const inner = document.querySelector('.messages-inner');
+    if (!inner) return;
+    const el = inner.querySelector('.bubble-progress[data-agent-id="' + agentId + '"]');
+    if (!el) return;
+
+    if (status === 'done') {
+      el.classList.add('done');
+      const spinner = el.querySelector('.bubble-progress-spinner');
+      if (spinner) { spinner.textContent = ''; spinner.classList.add('done-icon'); }
+      const label = el.querySelector('.bubble-progress-label');
+      if (label) label.textContent = '已完成';
+      const toolSpan = el.querySelector('.bubble-progress-tool');
+      if (toolSpan) toolSpan.remove();
+    } else if (status === 'error') {
+      el.classList.add('error');
+      const spinner = el.querySelector('.bubble-progress-spinner');
+      if (spinner) { spinner.textContent = ''; spinner.classList.add('error-icon'); }
+      const label = el.querySelector('.bubble-progress-label');
+      if (label) label.textContent = '执行失败';
+    } else if (status === 'running' && toolName) {
+      let toolSpan = el.querySelector('.bubble-progress-tool');
+      if (toolSpan) {
+        toolSpan.textContent = toolName;
+      } else {
+        toolSpan = document.createElement('span');
+        toolSpan.className = 'bubble-progress-tool';
+        toolSpan.textContent = toolName;
+        el.appendChild(toolSpan);
+      }
+    }
+  },
+
   /**
    * 创建消息 DOM 元素（不追加到 DOM）
    * 用于虚拟列表等场景

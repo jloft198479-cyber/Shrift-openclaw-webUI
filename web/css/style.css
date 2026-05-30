@@ -1030,6 +1030,122 @@ body.resizing-agent-section * {
   to { transform: rotate(360deg); }
 }
 
+/* ── 智能调度状态栏 ─────────────────────────────────────── */
+#dispatch-status-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 32px;
+  max-width: 720px;
+  margin: 0 auto;
+  width: 100%;
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--surface);
+  transition: opacity 0.3s ease;
+}
+.dispatch-spinner {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border: 1.5px solid #999;
+  border-top-color: #333;
+  border-radius: 50%;
+  animation: subagentSpin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+/* ── 气泡内进度块 ───────────────────────────────────────── */
+.bubble-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+.bubble-progress-spinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 1.5px solid #999;
+  border-top-color: #333;
+  border-radius: 50%;
+  animation: subagentSpin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+.bubble-progress-name {
+  font-weight: 500;
+  color: var(--text-2);
+}
+.bubble-progress-label {
+  color: var(--muted);
+}
+.bubble-progress-tool {
+  color: var(--meta);
+  font-size: 12px;
+}
+.bubble-progress-tool::before {
+  content: '·';
+  margin-right: 4px;
+}
+.bubble-progress.done {
+  opacity: 0.7;
+}
+.bubble-progress.done .bubble-progress-spinner {
+  animation: none;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+.bubble-progress.done .bubble-progress-spinner.done-icon::before {
+  content: '';
+  display: block;
+  width: 14px; height: 8px;
+  border-left: 1.5px solid #333;
+  border-bottom: 1.5px solid #333;
+  transform: rotate(-45deg) translate(1px, -2px);
+}
+.bubble-progress.error .bubble-progress-spinner {
+  animation: none;
+  border: none;
+  border-radius: 0;
+  background: none;
+}
+.bubble-progress.error .bubble-progress-spinner.error-icon::before,
+.bubble-progress.error .bubble-progress-spinner.error-icon::after {
+  content: '';
+  display: block;
+  position: absolute;
+  width: 1.5px; height: 14px;
+  background: #333;
+  top: 0; left: 6px;
+}
+.bubble-progress.error .bubble-progress-spinner.error-icon::before {
+  transform: rotate(45deg);
+}
+.bubble-progress.error .bubble-progress-spinner.error-icon::after {
+  transform: rotate(-45deg);
+}
+.bubble-progress.error .bubble-progress-spinner {
+  position: relative;
+}
+.bubble-progress.error .bubble-progress-label {
+  color: #333;
+}
+
+/* ── 气泡内分隔线 ───────────────────────────────────────── */
+.bubble-separator {
+  border-top: 1px solid var(--border-light);
+  margin: 10px 0 6px;
+}
+
+/* ── 气泡内子 Agent 内容块 ──────────────────────────────── */
+.bubble-content-block {
+  margin-top: 2px;
+}
+.bubble-content-block .agent-content {
+  margin-top: 2px;
+}
+
 /* ── 输入区 ─────────────────────────────────────────────── */
 #input-area {
   padding: 12px 32px 24px;

@@ -173,6 +173,10 @@ const StreamRenderer = {
   _resetSendBtn: function () {
     const btn = document.getElementById('send-btn');
     if (!btn) return;
+    if (State.dispatching) {
+      btn.disabled = true;
+      return;
+    }
     btn.disabled = false;
     btn.classList.remove('is-stop');
     btn.setAttribute('aria-label', '发送');

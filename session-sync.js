@@ -50,19 +50,17 @@ function _extractFrontendSessionId(sessionKey) {
 function onSubagentGatewayEvent(data) {
   try {
     const eventName = data.event || '';
-    const payload = data.payload || {};
-    const sessionKey = payload.sessionKey || '';
+    const p = data.payload || {};
+    const sessionKey = p.sessionKey || '';
+
     let frontendSessionId = _extractFrontendSessionId(sessionKey);
 
-    if (!frontendSessionId && payload.data) {
-      try {
-        const innerData = typeof payload.data === 'string' ? JSON.parse(payload.data) : payload.data;
-        const parentKey = innerData.parentSessionKey || innerData.spawnedBy || '';
-        frontendSessionId = _extractFrontendSessionId(parentKey);
-      } catch (e) {}
+    if (!frontendSessionId) {
+      const parentKey = p.parentSessionKey || p.spawnedBy || '';
+      frontendSessionId = _extractFrontendSessionId(parentKey);
     }
 
-    if ((eventName === 'session.tool' || eventName === 'agent') && payload) {
+    if ((eventName === 'session.tool' || eventName === 'agent') && sessionKey) {
       const parts = sessionKey.split(':');
       if (parts.length >= 2 && parts[1] !== 'main') {
         const oldId = _lastAgentId;

@@ -48,6 +48,7 @@ const ChatView = {
   clearMessages: function () {
     AttachmentBar.clear();
     MessageRenderer.clearMessages();
+    ChatController._clearDispatchState();
   },
 
   /**

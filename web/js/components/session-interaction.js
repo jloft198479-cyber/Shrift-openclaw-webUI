@@ -65,7 +65,20 @@ const SessionInteraction = {
         return;
       }
     }
-    // 没有 assistant 消息，追加
+    session.messages.push({ role: 'assistant', content: content });
+  },
+
+  appendToLastAssistantMessage: function (session, content, agentId) {
+    if (!session || !session.messages) return;
+    for (let i = session.messages.length - 1; i >= 0; i--) {
+      if (session.messages[i].role === 'assistant') {
+        var existing = session.messages[i].content || '';
+        var separator = existing ? '\n\n---\n\n' : '';
+        var prefix = agentId ? '[' + agentId + '] ' : '';
+        session.messages[i].content = existing + separator + prefix + content;
+        return;
+      }
+    }
     session.messages.push({ role: 'assistant', content: content });
   },
 };

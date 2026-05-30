@@ -143,47 +143,44 @@ try {
     sseManager.broadcast({ type: 'gateway', data: data });
     sessionSync.onSubagentGatewayEvent(data);
     const eventName = data.event || '';
-    const payload = data.payload || {};
-    const sessionKey = payload.sessionKey || '';
-    debugTrace.trace('gateway-event', { event: eventName, sessionKey: sessionKey, data: JSON.stringify(payload).substring(0, 500) });
-    if ((eventName === 'session.tool' || eventName === 'agent') && payload) {
-      let d = payload.data || {};
-      if (typeof d === 'string') {
-        try { d = JSON.parse(d); } catch (e) { d = {}; }
-      }
-      // 子 Agent 的工具事件可能通过 spawnedBy 或 d.sessionKey 传递
-      let subAgentId = '';
-      const dataSessionKey = d.sessionKey || '';
-      if (dataSessionKey && dataSessionKey.indexOf(':subagent:') >= 0) {
-        subAgentId = dataSessionKey.split(':')[1] || '';
-      }
-      if (!subAgentId && d.spawnedBy) {
-        const spawnedParts = d.spawnedBy.split(':');
-        if (spawnedParts.length >= 2 && spawnedParts[1] !== 'main') subAgentId = spawnedParts[1];
-      }
-      if (!subAgentId) {
-        const topSK = payload.sessionKey || '';
-        if (topSK.indexOf(':subagent:') >= 0) subAgentId = topSK.split(':')[1] || '';
-      }
-      const toolData = d.data || {};
+    const p = data.payload || {};
+    const sessionKey = p.sessionKey || '';
+    debugTrace.trace('gateway-event', { event: eventName, sessionKey: sessionKey, payloadKeys: Object.keys(p).join(',') });
+    if ((eventName === 'session.tool' || eventName === 'agent') && p) {
+      const toolData = p.data || {};
       const isToolStart = toolData.phase === 'start' && toolData.name;
+      let subAgentId = '';
+      if (sessionKey.indexOf(':subagent:') >= 0) {
+        subAgentId = sessionKey.split(':')[1] || '';
+      }
+      if (!subAgentId && p.spawnedBy) {
+        const parts = p.spawnedBy.split(':');
+        if (parts.length >= 2 && parts[1] !== 'main') subAgentId = parts[1];
+      }
       if (isToolStart && subAgentId) {
         _broadcastSubagentProgress(subAgentId, toolData.name);
       }
-    }
-    if (eventName === 'sessions.changed' && sessionKey.indexOf(':subagent:') >= 0) {
-      let d = payload.data || {};
-      if (typeof d === 'string') {
-        try { d = JSON.parse(d); } catch (e) { d = {}; }
+      if (isToolStart && toolData.name === 'sessions_spawn') {
+        let spawnAgentId = (toolData.args && toolData.args.agentId) || '';
+        if (!spawnAgentId && toolData.meta) {
+          var m = toolData.meta.match(/agent\s+(\S+)/);
+          if (m) spawnAgentId = m[1];
+        }
+        if (spawnAgentId && spawnAgentId !== 'main') {
+          _broadcastSubagentProgress(spawnAgentId, 'sessions_spawn');
+        }
       }
-      const agentId = (sessionKey || '').split(':')[1] || '';
-      const sessionData = d.session || {};
-      const parentKey = d.spawnedBy || sessionData.spawnedBy || '';
-      const sessionId = _extractFrontendSessionId(parentKey);
-      if (d.phase === 'start' || d.reason === 'create') {
-        _broadcastSubagentProgress(agentId, '', sessionId);
-      } else if (d.phase === 'end' || d.phase === 'error' || d.reason === 'delete') {
-        _broadcastSubagentDone(agentId, sessionId);
+    }
+    if (eventName === 'sessions.changed') {
+      if (sessionKey.indexOf(':subagent:') >= 0) {
+        const agentId = sessionKey.split(':')[1] || '';
+        const parentKey = p.spawnedBy || (p.session && p.session.spawnedBy) || '';
+        const sessionId = _extractFrontendSessionId(parentKey);
+        if (p.phase === 'start' || p.reason === 'create') {
+          _broadcastSubagentProgress(agentId, '', sessionId);
+        } else if (p.phase === 'end' || p.phase === 'error' || p.reason === 'delete') {
+          _broadcastSubagentDone(agentId, sessionId);
+        }
       }
     }
   });
