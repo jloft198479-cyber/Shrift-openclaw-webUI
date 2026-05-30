@@ -68,10 +68,11 @@ function onSubagentGatewayEvent(data) {
         debugTrace.trace('lastAgentId-change', { from: oldId, to: _lastAgentId, trigger: eventName, sessionKey: sessionKey });
       }
     }
-    if (eventName === 'session.tool' || eventName === 'agent'
-        || eventName === 'sessions.changed' || eventName === 'session.created' || eventName === 'session.updated') {
+    if (eventName === 'sessions.changed' || eventName === 'session.created' || eventName === 'session.updated') {
       _scheduleRead(sessionKey, frontendSessionId);
-    }
+  } else if ((eventName === 'session.tool' || eventName === 'agent') && sessionKey && sessionKey.indexOf(':subagent:') < 0) {
+      _scheduleRead(sessionKey, frontendSessionId);
+  }
   } catch (e) { _logError('gatewayEvent', e); }
 }
 
