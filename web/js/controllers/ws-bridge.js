@@ -89,9 +89,6 @@ const WsBridge = {
       }
     });
 
-    this._source.addEventListener('chat-update', function () {
-    });
-
     this._source.addEventListener('announce-result', function (e) {
       try {
         const data = JSON.parse(e.data);
