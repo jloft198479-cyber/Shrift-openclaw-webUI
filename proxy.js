@@ -66,13 +66,17 @@ function createProxy(gwHost, gwPort, gwToken, store) {
       });
     });
     gwReq.on('error', function () {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ gateway: 'offline' }));
+      if (!res.headersSent) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ gateway: 'offline' }));
+      }
     });
     gwReq.on('timeout', function () {
       gwReq.destroy();
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ gateway: 'offline' }));
+      if (!res.headersSent) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ gateway: 'offline' }));
+      }
     });
     gwReq.end();
   }
