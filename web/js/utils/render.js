@@ -8,16 +8,16 @@
 
 /* ── Markdown → HTML（基于 CDN 加载的 marked.js） ───────── */
 /* 自定义 renderer：给代码块加语言标签 + 复制按钮 */
-var _mdRenderer = null;
+let _mdRenderer = null;
 function _getMdRenderer() {
   if (_mdRenderer) return _mdRenderer;
   _mdRenderer = new marked.Renderer();
   _mdRenderer.code = function(obj) {
     // marked v12+ 传入 {text, lang, escaped} 对象
-    var code = typeof obj === 'object' ? obj.text : obj;
-    var lang = typeof obj === 'object' ? (obj.lang || '') : arguments[1] || '';
-    var id = 'cb-' + Utils.uid();
-    var langLabel = lang ? '<span class="cb-lang">' + Utils.escapeHtml(lang) + '</span>' : '<span class="cb-lang">code</span>';
+    const code = typeof obj === 'object' ? obj.text : obj;
+    const lang = typeof obj === 'object' ? (obj.lang || '') : arguments[1] || '';
+    const id = 'cb-' + Utils.uid();
+    const langLabel = lang ? '<span class="cb-lang">' + Utils.escapeHtml(lang) + '</span>' : '<span class="cb-lang">code</span>';
     return '<div class="code-block">'
       + '<div class="code-header">'
       + langLabel
@@ -30,8 +30,8 @@ function _getMdRenderer() {
 }
 
 /* Markdown 渲染结果缓存（LRU，避免重复 marked.parse + DOMPurify） */
-var _mdCache = new Map();
-var _mdCacheMax = Constants.LIMIT.MD_CACHE_MAX;
+const _mdCache = new Map();
+const _mdCacheMax = Constants.LIMIT.MD_CACHE_MAX;
 
 /**
  * 渲染 Markdown 文本为 HTML
@@ -40,11 +40,11 @@ var _mdCacheMax = Constants.LIMIT.MD_CACHE_MAX;
  */
 function renderMarkdown(text) {
   if (!text) return '';
-  var cached = _mdCache.get(text);
+  const cached = _mdCache.get(text);
   if (cached) return cached;
-  var html;
+  let html;
   if (typeof marked !== 'undefined') {
-    var raw = marked.parse(text, { breaks: true, gfm: true, renderer: _getMdRenderer() });
+    const raw = marked.parse(text, { breaks: true, gfm: true, renderer: _getMdRenderer() });
     if (typeof DOMPurify !== 'undefined') {
       html = DOMPurify.sanitize(raw, {
         ADD_TAGS: ['code', 'pre', 'span', 'button', 'img'],
@@ -58,7 +58,7 @@ function renderMarkdown(text) {
   }
   _mdCache.set(text, html);
   if (_mdCache.size > _mdCacheMax) {
-    var first = _mdCache.keys().next().value;
+    const first = _mdCache.keys().next().value;
     _mdCache.delete(first);
   }
   return html;
@@ -66,12 +66,12 @@ function renderMarkdown(text) {
 
 /* 复制按钮事件委托（含 execCommand fallback） */
 document.addEventListener('click', function(e) {
-  var btn = e.target.closest('.cb-copy');
+  const btn = e.target.closest('.cb-copy');
   if (!btn) return;
-  var id = btn.getAttribute('data-cb-id');
-  var codeEl = document.getElementById(id);
+  const id = btn.getAttribute('data-cb-id');
+  const codeEl = document.getElementById(id);
   if (!codeEl) return;
-  var text = codeEl.textContent || codeEl.innerText;
+  const text = codeEl.textContent || codeEl.innerText;
   function done() {
     btn.textContent = '已复制 ✓';
     btn.classList.add('copied');

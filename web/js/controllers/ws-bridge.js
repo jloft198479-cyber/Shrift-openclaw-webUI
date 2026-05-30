@@ -22,7 +22,7 @@
  *     显示子 Agent 正在执行的工具，提供执行流程可视化。
  */
 
-var WsBridge = {
+const WsBridge = {
   _source: null,
   _reconnectTimer: null,
   _connected: false,
@@ -36,7 +36,7 @@ var WsBridge = {
   },
 
   connect: function () {
-    var self = this;
+    const self = this;
     if (this._source) {
       try { this._source.close(); } catch (e) {}
     }
@@ -64,7 +64,7 @@ var WsBridge = {
 
     this._source.addEventListener('gateway', function (e) {
       try {
-        var data = JSON.parse(e.data);
+        const data = JSON.parse(e.data);
         self._handleGatewayEvent(data);
       } catch (err) {
         console.error('[WsBridge] Parse error:', err);
@@ -73,7 +73,7 @@ var WsBridge = {
 
     this._source.addEventListener('status', function (e) {
       try {
-        var data = JSON.parse(e.data);
+        const data = JSON.parse(e.data);
         if (data.ws === 'connected') {
           self._connected = true;
           State.setState({ connected: true });
@@ -94,22 +94,32 @@ var WsBridge = {
 
     this._source.addEventListener('announce-result', function (e) {
       try {
-        var data = JSON.parse(e.data);
-        DebugTrace.log('ws-bridge-announce-result', { agentId: data.agentId || '', msgCount: data.messages ? data.messages.length : 0 });
+        const data = JSON.parse(e.data);
+        DebugTrace.log('ws-bridge-announce-result', { agentId: data.agentId || '', sessionId: data.sessionId || '', msgCount: data.messages ? data.messages.length : 0 });
         if (data.messages && data.messages.length > 0 && typeof ChatController !== 'undefined' && ChatController.handleAnnounceResult) {
-          ChatController.handleAnnounceResult(data.messages, data.agentId || '');
+          ChatController.handleAnnounceResult(data.messages, data.agentId || '', data.sessionId || '');
         }
       } catch (err) { console.error('[WsBridge] announce-result error:', err); }
     });
 
     this._source.addEventListener('subagent-progress', function (e) {
       try {
-        var data = JSON.parse(e.data);
+        const data = JSON.parse(e.data);
         DebugTrace.log('ws-bridge-subagent-progress', { progress: data.progress });
         if (data.progress && typeof ChatController !== 'undefined' && ChatController.handleSubagentProgress) {
           ChatController.handleSubagentProgress(data.progress);
         }
       } catch (err) { console.error('[WsBridge] subagent-progress error:', err); }
+    });
+
+    this._source.addEventListener('subagent-done', function (e) {
+      try {
+        const data = JSON.parse(e.data);
+        DebugTrace.log('ws-bridge-subagent-done', { agentId: data.agentId, sessionId: data.sessionId });
+        if (data.agentId && typeof ChatController !== 'undefined' && ChatController.handleSubagentDone) {
+          ChatController.handleSubagentDone(data.agentId, data.sessionId || '');
+        }
+      } catch (err) { console.error('[WsBridge] subagent-done error:', err); }
     });
   },
 
@@ -128,7 +138,7 @@ var WsBridge = {
   _scheduleReconnect: function () {
     if (this._reconnectTimer) return;
 
-    var delay = Math.min(
+    const delay = Math.min(
       this._baseDelay * Math.pow(2, this._retryCount),
       this._maxRetryDelay
     );
@@ -136,7 +146,7 @@ var WsBridge = {
 
     console.log('[WsBridge] Reconnecting in ' + (delay / 1000) + 's (attempt ' + this._retryCount + ')');
 
-    var self = this;
+    const self = this;
     this._reconnectTimer = setTimeout(function () {
       self._reconnectTimer = null;
       self.connect();
@@ -144,15 +154,15 @@ var WsBridge = {
   },
 
   _handleGatewayEvent: function (data) {
-    var inner = data.data || data;
-    var eventName = inner.event || '';
-    var payload = inner.payload || inner.params || inner;
+    const inner = data.data || data;
+    const eventName = inner.event || '';
+    const payload = inner.payload || inner.params || inner;
 
-    var fns = this._listeners[eventName];
+    const fns = this._listeners[eventName];
     if (fns) fns.forEach(function (fn) {
       try { fn(payload, data); } catch (e) { console.error('[WsBridge] Listener error:', e); }
     });
-    var starFns = this._listeners['*'];
+    const starFns = this._listeners['*'];
     if (starFns) starFns.forEach(function (fn) {
       try { fn(payload, data, eventName); } catch (e) { console.error('[WsBridge] wildcard listener error:', e); }
     });

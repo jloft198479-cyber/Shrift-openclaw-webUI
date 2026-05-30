@@ -9,7 +9,7 @@
  *   Constants.LIMIT.MAX_CHARS
  */
 
-var Constants = {
+const Constants = {
 
   // ═══ 超时时间（毫秒）═══
 
@@ -146,4 +146,4 @@ var Constants = {
 
 // ═══ 向后兼容：保留原有常量 ═══
 
-var MAX_FILE_SIZE = Constants.FILE.MAX_SIZE;
+const MAX_FILE_SIZE = Constants.FILE.MAX_SIZE;

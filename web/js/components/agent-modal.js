@@ -108,10 +108,10 @@ const AgentModal = {
     const isEdit = opts.isEdit || false;
 
     function buildModelOptions(currentModel) {
-      var models = State.models || [];
-      var defModel = State.defaultModel || '';
-      var selected = currentModel || defModel || '';
-      var html = '<option value="">默认 (' + escapeHtml(defModel || '未配置') + ')</option>';
+      const models = State.models || [];
+      const defModel = State.defaultModel || '';
+      const selected = currentModel || defModel || '';
+      let html = '<option value="">默认 (' + escapeHtml(defModel || '未配置') + ')</option>';
       models.forEach(function(m) {
         html += '<option value="' + escapeHtml(m.id) + '"' + (m.id === selected ? ' selected' : '') + '>' + escapeHtml(m.name) + '</option>';
       });
@@ -267,10 +267,10 @@ const AgentModal = {
           const end = textarea.selectionEnd;
           const before = textarea.value.substring(0, start);
           const after = textarea.value.substring(end);
-          var val = before + tagText + after;
+          let val = before + tagText + after;
           if (!val.endsWith('\n')) val += '\n';
           textarea.value = val;
-          var cursorPos = start + tagText.length;
+          const cursorPos = start + tagText.length;
           textarea.selectionStart = textarea.selectionEnd = cursorPos;
           textarea.focus();
         }

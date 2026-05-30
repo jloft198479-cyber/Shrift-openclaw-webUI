@@ -37,7 +37,8 @@ const Api = {
       if (agentId) {
         fetchOpts.headers['x-openclaw-agent-id'] = agentId;
       }
-      fetchOpts.headers['x-openclaw-session-key'] = 'agent:' + (agentId || 'main') + ':webui';
+      const currentSid = State.currentSessionId || '';
+      fetchOpts.headers['x-openclaw-session-key'] = 'agent:' + (agentId || 'main') + ':webui' + (currentSid ? ':' + currentSid : '');
 
       const res = await fetch('/v1/chat/completions', fetchOpts);
 

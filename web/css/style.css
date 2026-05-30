@@ -1013,6 +1013,19 @@ body.resizing-agent-section * {
   content: '·';
   margin-right: 4px;
 }
+.subagent-progress-inline.done {
+  opacity: 0.6;
+}
+.subagent-progress-inline.done .subagent-progress-spinner {
+  animation: none;
+  border-color: var(--success, #4CAF50);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--success, #4CAF50);
+}
 @keyframes subagentSpin {
   to { transform: rotate(360deg); }
 }
@@ -1969,7 +1982,7 @@ body.resizing-agent-section * {
 }
 .modal-body textarea { resize: vertical; min-height: 56px; }
 .modal-body textarea#agent-prompt { min-height: 80px; max-height: 240px; }
-.modal-body.markdown-body h1, .modal-body.markdown-body h2, .modal-body.markdown_body h3 { margin: 12px 0 6px; color: var(--text); }
+.modal-body.markdown-body h1, .modal-body.markdown-body h2, .modal-body.markdown-body h3 { margin: 12px 0 6px; color: var(--text); }
 .modal-body.markdown-body table { width: 100%; border-collapse: collapse; font-size: var(--font-base); }
 .modal-body.markdown-body th, .modal-body.markdown-body td { padding: 6px 10px; border: 1px solid var(--border); text-align: left; }
 .modal-body.markdown-body th { background: var(--surface); font-weight: var(--weight-semibold); }
@@ -2048,23 +2061,6 @@ body.resizing-agent-section * {
 .modal-btn.secondary { background: var(--bg); color: var(--text); }
 .modal-btn.primary { background: var(--accent); color: var(--accent-on); border-color: var(--accent); }
 .modal-btn.primary:hover { background: var(--accent-hover); }
-
-/* Toast 通知 */
-.toast {
-  position: fixed;
-  bottom: 80px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-secondary);
-  color: var(--accent-on);
-  padding: 10px 20px;
-  border-radius: 8px;
-  font-size: var(--font-md);
-  z-index: var(--z-toast);
-  transition: opacity .3s;
-  max-width: 80%;
-  text-align: center;
-}
 
 /* 头像选择器 */
 .avatar-picker-unified {

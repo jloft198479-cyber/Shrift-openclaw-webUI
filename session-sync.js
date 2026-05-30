@@ -4,27 +4,32 @@
  * 职责：收到 Gateway WS 事件后，读取主 agent session 文件，检测新消息并广播到前端。
  *
  * 输出事件：
- *   announce-result    → 主 agent session 中的新 assistant 消息
+ *   announce-result    → 主 agent session 中的新 assistant 消息（携带 sessionId）
  *   subagent-progress  → 子 agent 执行进度（正在调用的工具）
  *
  * 触发方式：
- *   Gateway WS 事件到达 → 延迟读一次文件 → 广播 → 结束
+ *   Gateway WS 事件到达 → 提取 sessionKey → 延迟读对应文件 → 广播 → 结束
  *   不轮询，不循环。
+ *
+ * session 归属：
+ *   前端发送请求时在 x-openclaw-session-key 中携带 session ID，
+ *   格式: agent:<agentId>:webui:<sessionId>
+ *   本模块从事件的 sessionKey 中提取 sessionId，随 announce-result 传回前端，
+ *   前端据此将消息路由到正确的 session。
  */
 
 const fs = require('fs');
 const path = require('path');
 const debugTrace = require('./debug-trace');
 
-var _broadcastSSE = null;
-var _syncFilePath = '';
-var _syncFileOffset = 0;
-var _retryTimer = null;
-var _retryCount = 0;
-var MAX_RETRIES = 2;
-var RETRY_DELAY_MS = 1000;
-var INITIAL_DELAY_MS = 500;
-var MAIN_AGENT_SESSIONS_SUBDIR = path.join('agents', 'main', 'sessions');
+let _broadcastSSE = null;
+let _fileOffsets = {};
+let _retryTimer = null;
+let _retryCount = 0;
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 1000;
+const INITIAL_DELAY_MS = 500;
+const MAIN_AGENT_SESSIONS_SUBDIR = path.join('agents', 'main', 'sessions');
 
 function _logError(prefix, e) {
   if (e && e.message) console.error('[Sync] ' + prefix + ': ' + e.message);
@@ -34,84 +39,104 @@ function init(broadcastFn) {
   _broadcastSSE = broadcastFn;
 }
 
-var _lastAgentId = '';
+let _lastAgentId = '';
+
+function _extractFrontendSessionId(sessionKey) {
+  if (!sessionKey || sessionKey.indexOf(':webui:') < 0) return '';
+  const idx = sessionKey.indexOf(':webui:');
+  return sessionKey.substring(idx + 7);
+}
 
 function onSubagentGatewayEvent(data) {
   try {
-    var eventName = data.event || '';
-    if ((eventName === 'session.tool' || eventName === 'agent') && data.payload) {
-      var sk = data.payload.sessionKey || '';
-      var parts = sk.split(':');
+    const eventName = data.event || '';
+    const payload = data.payload || {};
+    const sessionKey = payload.sessionKey || '';
+    let frontendSessionId = _extractFrontendSessionId(sessionKey);
+
+    if (!frontendSessionId && payload.data) {
+      try {
+        const innerData = typeof payload.data === 'string' ? JSON.parse(payload.data) : payload.data;
+        const parentKey = innerData.parentSessionKey || innerData.spawnedBy || '';
+        frontendSessionId = _extractFrontendSessionId(parentKey);
+      } catch (e) {}
+    }
+
+    if ((eventName === 'session.tool' || eventName === 'agent') && payload) {
+      const parts = sessionKey.split(':');
       if (parts.length >= 2 && parts[1] !== 'main') {
-        var oldId = _lastAgentId;
+        const oldId = _lastAgentId;
         _lastAgentId = parts[1];
-        debugTrace.trace('lastAgentId-change', { from: oldId, to: _lastAgentId, trigger: eventName, sessionKey: sk });
+        debugTrace.trace('lastAgentId-change', { from: oldId, to: _lastAgentId, trigger: eventName, sessionKey: sessionKey });
       }
     }
     if (eventName === 'session.tool' || eventName === 'agent'
         || eventName === 'sessions.changed' || eventName === 'session.created' || eventName === 'session.updated') {
-      _scheduleRead();
+      _scheduleRead(sessionKey, frontendSessionId);
     }
   } catch (e) { _logError('gatewayEvent', e); }
 }
 
-function _scheduleRead() {
+function _scheduleRead(sessionKey, frontendSessionId) {
   if (_retryTimer) return;
   _retryCount = 0;
   _retryTimer = setTimeout(function () {
     _retryTimer = null;
-    _doRead();
+    _doRead(sessionKey, frontendSessionId);
   }, INITIAL_DELAY_MS);
 }
 
-function _doRead() {
-  var targetFile = _findTargetFile();
+function _doRead(sessionKey, frontendSessionId) {
+  const targetFile = _findTargetFile(sessionKey);
   if (!targetFile) return;
 
-  if (targetFile !== _syncFilePath) {
-    _syncFilePath = targetFile;
+  if (!(targetFile in _fileOffsets)) {
     try {
-      _syncFileOffset = fs.statSync(targetFile).size;
-    } catch (e) { _syncFileOffset = 0; }
+      _fileOffsets[targetFile] = fs.statSync(targetFile).size;
+    } catch (e) { _fileOffsets[targetFile] = 0; }
     return;
   }
 
-  var newMessages = [];
+  let newMessages = [];
   try {
-    var stat = fs.statSync(targetFile);
-    if (stat.size <= _syncFileOffset) {
-      _maybeRetry();
+    const stat = fs.statSync(targetFile);
+    const currentOffset = _fileOffsets[targetFile] || 0;
+    if (stat.size <= currentOffset) {
+      _maybeRetry(sessionKey, frontendSessionId);
       return;
     }
-    var readSize = stat.size - _syncFileOffset;
-    var fd = fs.openSync(targetFile, 'r');
+    const readSize = stat.size - currentOffset;
+    const fd = fs.openSync(targetFile, 'r');
+    let buf;
     try {
-      var buf = Buffer.alloc(readSize);
-      fs.readSync(fd, buf, 0, readSize, _syncFileOffset);
+      buf = Buffer.alloc(readSize);
+      fs.readSync(fd, buf, 0, readSize, currentOffset);
     } finally {
       fs.closeSync(fd);
     }
-    _syncFileOffset = stat.size;
+    _fileOffsets[targetFile] = stat.size;
     newMessages = _parseAssistantMessages(buf.toString('utf8')).messages;
   } catch (e) { _logError('read', e); }
 
   if (newMessages.length > 0) {
-    debugTrace.trace('announce-result-broadcast', { agentId: _lastAgentId, msgCount: newMessages.length, lastMsgPreview: (newMessages[newMessages.length - 1].content || '').substring(0, 100) });
+    // Fix 4: main session 的 announce 不应带子 agent 标签
+    if (sessionKey && sessionKey.indexOf(':webui:') >= 0) _lastAgentId = '';
+    debugTrace.trace('announce-result-broadcast', { agentId: _lastAgentId, sessionId: frontendSessionId, msgCount: newMessages.length, lastMsgPreview: (newMessages[newMessages.length - 1].content || '').substring(0, 100) });
     if (_broadcastSSE) {
-      _broadcastSSE({ type: 'announce-result', messages: newMessages, agentId: _lastAgentId });
+      _broadcastSSE({ type: 'announce-result', messages: newMessages, agentId: _lastAgentId, sessionId: frontendSessionId });
     }
     _lastAgentId = '';
   } else {
-    _maybeRetry();
+    _maybeRetry(sessionKey, frontendSessionId);
   }
 }
 
-function _maybeRetry() {
+function _maybeRetry(sessionKey, frontendSessionId) {
   if (_retryCount < MAX_RETRIES) {
     _retryCount++;
     _retryTimer = setTimeout(function () {
       _retryTimer = null;
-      _doRead();
+      _doRead(sessionKey, frontendSessionId);
     }, RETRY_DELAY_MS);
   }
 }
@@ -121,31 +146,30 @@ function stopSync() {
     clearTimeout(_retryTimer);
     _retryTimer = null;
   }
-  _syncFilePath = '';
-  _syncFileOffset = 0;
+  _fileOffsets = {};
   _retryCount = 0;
   console.log('[Sync] Stopped');
 }
 
 function _isHeartbeatSession(filePath) {
+  let fd = null;
   try {
-    var fd = fs.openSync(filePath, 'r');
-    var headBuf = Buffer.alloc(Math.min(4096, fs.fstatSync(fd).size));
+    fd = fs.openSync(filePath, 'r');
+    const headBuf = Buffer.alloc(Math.min(4096, fs.fstatSync(fd).size));
     fs.readSync(fd, headBuf, 0, headBuf.length, 0);
-    fs.closeSync(fd);
-    var head = headBuf.toString('utf8');
-    var lines = head.split('\n').filter(function (l) { return l.trim(); });
-    var checkedCount = 0;
-    for (var i = 0; i < lines.length && checkedCount < 5; i++) {
+    const head = headBuf.toString('utf8');
+    const lines = head.split('\n').filter(function (l) { return l.trim(); });
+    let checkedCount = 0;
+    for (let i = 0; i < lines.length && checkedCount < 5; i++) {
       try {
-        var item = JSON.parse(lines[i]);
+        const item = JSON.parse(lines[i]);
         checkedCount++;
         if (item.sessionKey && item.sessionKey.indexOf('heartbeat') >= 0) return true;
         if (item.type === 'message' && item.message && item.message.content) {
-          var content = item.message.content;
+          const content = item.message.content;
           if (Array.isArray(content)) {
-            var allHeartbeat = content.length > 0;
-            for (var c = 0; c < content.length; c++) {
+            let allHeartbeat = content.length > 0;
+            for (let c = 0; c < content.length; c++) {
               if (!content[c] || (content[c].text !== 'HEARTBEAT_OK' && content[c].text !== 'heartbeat')) {
                 allHeartbeat = false;
                 break;
@@ -158,24 +182,36 @@ function _isHeartbeatSession(filePath) {
     }
     return false;
   } catch (e) { return false; }
+  finally { if (fd !== null) { try { fs.closeSync(fd); } catch (e) {} } }
 }
 
-function _findTargetFile() {
+function _findTargetFile(sessionKey) {
   try {
-    var stateDir = process.env.OPENCLAW_STATE_DIR;
+    const stateDir = process.env.OPENCLAW_STATE_DIR;
     if (!stateDir) return null;
-    var sessionsDir = path.join(stateDir, MAIN_AGENT_SESSIONS_SUBDIR);
+    const sessionsDir = path.join(stateDir, MAIN_AGENT_SESSIONS_SUBDIR);
     if (!fs.existsSync(sessionsDir)) return null;
-    var files = fs.readdirSync(sessionsDir).filter(function (f) { return f.endsWith('.jsonl') && f.indexOf('trajectory') < 0; });
+    const files = fs.readdirSync(sessionsDir).filter(function (f) { return f.endsWith('.jsonl') && f.indexOf('trajectory') < 0; });
     if (files.length === 0) return null;
+
+    if (sessionKey) {
+      const normalizedKey = sessionKey.replace(/:/g, '_');
+      for (let fi = 0; fi < files.length; fi++) {
+        if (files[fi].indexOf(normalizedKey) >= 0) {
+          const fp = path.join(sessionsDir, files[fi]);
+          if (!_isHeartbeatSession(fp)) return fp;
+        }
+      }
+    }
+
     files.sort(function (a, b) {
-      var ta = 0, tb = 0;
+      let ta = 0, tb = 0;
       try { ta = fs.statSync(path.join(sessionsDir, a)).mtimeMs; } catch (e) {}
       try { tb = fs.statSync(path.join(sessionsDir, b)).mtimeMs; } catch (e) {}
       return tb - ta;
     });
-    for (var fi = 0; fi < files.length; fi++) {
-      var fp = path.join(sessionsDir, files[fi]);
+    for (let fi = 0; fi < files.length; fi++) {
+      const fp = path.join(sessionsDir, files[fi]);
       try {
         if (_isHeartbeatSession(fp)) continue;
         return fp;
@@ -186,16 +222,16 @@ function _findTargetFile() {
 }
 
 function _parseAssistantMessages(raw) {
-  var result = { messages: [] };
-  var lines = raw.split('\n').filter(function (l) { return l.trim(); });
-  for (var k = 0; k < lines.length; k++) {
+  const result = { messages: [] };
+  const lines = raw.split('\n').filter(function (l) { return l.trim(); });
+  for (let k = 0; k < lines.length; k++) {
     try {
-      var item = JSON.parse(lines[k]);
+      const item = JSON.parse(lines[k]);
       if (item.type === 'message' && item.message && item.message.role === 'assistant') {
-        var content = item.message.content || [];
-        var text = '';
+        const content = item.message.content || [];
+        let text = '';
         if (Array.isArray(content)) {
-          for (var c = 0; c < content.length; c++) {
+          for (let c = 0; c < content.length; c++) {
             if (content[c] && content[c].text) { text = content[c].text; }
           }
         } else if (typeof content === 'string') {
@@ -211,10 +247,10 @@ function _parseAssistantMessages(raw) {
 }
 
 function readGatewayAssistantMessages() {
-  var targetFile = _findTargetFile();
+  const targetFile = _findTargetFile();
   if (!targetFile) return [];
   try {
-    var raw = fs.readFileSync(targetFile, 'utf8');
+    const raw = fs.readFileSync(targetFile, 'utf8');
     return _parseAssistantMessages(raw).messages;
   } catch (e) { _logError('readMessages', e); return []; }
 }
@@ -222,7 +258,7 @@ function readGatewayAssistantMessages() {
 module.exports = {
   init: init,
   onSubagentGatewayEvent: onSubagentGatewayEvent,
-  startSync: _scheduleRead,
+  startSync: function () { _scheduleRead('', ''); },
   stopSync: stopSync,
   readGatewayAssistantMessages: readGatewayAssistantMessages,
 };

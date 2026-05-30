@@ -13,7 +13,7 @@
  * 向后兼容：保留 State.xxx 直接访问，逐步迁移到 State.ui.xxx
  */
 
-var State = {
+const State = {
   // ═══ 分组状态 ═══
 
   /** UI 相关状态 */
@@ -67,7 +67,7 @@ var State = {
   on: function (event, callback) {
     if (!this._listeners[event]) this._listeners[event] = new Set();
     this._listeners[event].add(callback);
-    var self = this;
+    const self = this;
     return function () { self.off(event, callback); };
   },
 
@@ -104,11 +104,11 @@ var State = {
    * @param {Object} partial - 部分状态
    */
   setState: function (partial) {
-    var events = new Set();
-    var self = this;
+    const events = new Set();
+    const self = this;
 
     // 分组状态的 key 映射
-    var groupKeyToEvent = {
+    const groupKeyToEvent = {
       // UI 组
       'ui.activeModal': 'modal',
       'ui.editingAgent': 'modal',
@@ -134,7 +134,7 @@ var State = {
     };
 
     // 向后兼容：扁平 key 映射
-    var flatKeyToEvent = {
+    const flatKeyToEvent = {
       sessions: 'session-list',
       currentSessionId: 'session-switch',
       currentAgent: 'agent-switch',
@@ -153,7 +153,7 @@ var State = {
     };
 
     // 向后兼容：扁平 key 到分组 key 的映射
-    var flatToGroup = {
+    const flatToGroup = {
       currentSessionId: 'chat.currentSessionId',
       streaming: 'chat.streaming',
       userScrolledUp: 'chat.userScrolledUp',
@@ -170,38 +170,38 @@ var State = {
       filter: 'ui.filter',
     };
 
-    for (var key in partial) {
-      var value = partial[key];
+    for (const key in partial) {
+      const value = partial[key];
 
       // 处理分组状态
       if (this[key] && typeof this[key] === 'object' && !Array.isArray(this[key]) && typeof value === 'object' && value !== null) {
         // 分组更新：State.setState({ chat: { streaming: true } })
-        var group = this[key];
-        for (var subKey in value) {
+        const group = this[key];
+        for (const subKey in value) {
           if (group[subKey] !== value[subKey]) {
             group[subKey] = value[subKey];
-            var groupEventKey = key + '.' + subKey;
-            var ev = groupKeyToEvent[groupEventKey];
+            const groupEventKey = key + '.' + subKey;
+            const ev = groupKeyToEvent[groupEventKey];
             if (ev) events.add(ev);
           }
         }
       }
       // 处理扁平 key（向后兼容）
       else if (flatToGroup[key]) {
-        var groupPath = flatToGroup[key];
-        var parts = groupPath.split('.');
-        var groupObj = this[parts[0]];
-        var subKey = parts[1];
+        const groupPath = flatToGroup[key];
+        const parts = groupPath.split('.');
+        const groupObj = this[parts[0]];
+        const subKey = parts[1];
         if (groupObj[subKey] !== value) {
           groupObj[subKey] = value;
-          var ev = flatKeyToEvent[key];
+          const ev = flatKeyToEvent[key];
           if (ev) events.add(ev);
         }
       }
       // 处理顶层 key（sessions）
       else if (this[key] !== value) {
         this[key] = value;
-        var ev = flatKeyToEvent[key];
+        const ev = flatKeyToEvent[key];
         if (ev) events.add(ev);
       }
     }
@@ -216,8 +216,8 @@ var State = {
    */
   findAgent: function (nameOrId) {
     if (!nameOrId) return null;
-    var agents = this.agent.agents;
-    for (var i = 0; i < agents.length; i++) {
+    const agents = this.agent.agents;
+    for (let i = 0; i < agents.length; i++) {
       if (agents[i].id === nameOrId || agents[i].name === nameOrId) return agents[i];
     }
     return null;

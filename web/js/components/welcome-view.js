@@ -1,10 +1,10 @@
 /* ── welcome-view.js — 欢迎页 + Agent 模式顶栏（纯 UI 渲染）──── */
 
-var WelcomeView = {
+const WelcomeView = {
 
   showWelcome: function (opts) {
-    var welcome = document.getElementById('welcome');
-    var messages = document.getElementById('messages');
+    const welcome = document.getElementById('welcome');
+    const messages = document.getElementById('messages');
     if (!welcome) return;
     welcome.classList.remove('hidden');
     if (messages) messages.style.display = 'none';
@@ -12,23 +12,23 @@ var WelcomeView = {
     WelcomeView.updateAgentModeBar();
 
     if (opts && opts.agent) {
-      var agent = opts.agent;
-      var icon = agent.avatar || '🤖';
-      var displayName = agent.displayName || agent.name || '';
-      var desc = agent.description || '输入你的需求，该助手将为你处理';
+      const agent = opts.agent;
+      const icon = agent.avatar || '🤖';
+      const displayName = agent.displayName || agent.name || '';
+      const desc = agent.description || '输入你的需求，该助手将为你处理';
       welcome.innerHTML = '<div class="welcome-logo" style="font-size:32px;line-height:1">' + renderAgentAvatar(icon, displayName) + '</div>'
         + '<h2>与 ' + escapeHtml(displayName) + ' 对话</h2>'
         + '<p>' + escapeHtml(desc) + '</p>'
-        + '<p style="margin-top:8px"><a href="#" id="exit-agent-link" style="color:var(--text-3);font-size:13px;text-decoration:none">← 返回主界面</a></p>';
-      var exitLink = document.getElementById('exit-agent-link');
+        + '<p style="margin-top:8px"><a href="#" id="exit-agent-link" style="color:var(--muted);font-size:13px;text-decoration:none">← 返回主界面</a></p>';
+      const exitLink = document.getElementById('exit-agent-link');
       if (exitLink) exitLink.addEventListener('click', function (e) { e.preventDefault(); SessionManager.exitAgentMode(); });
     } else {
-      var suggestions = [
+      const suggestions = [
         { text: '帮我总结这篇文章的核心观点', icon: '📋' },
         { text: '写一段代码解决这个需求', icon: '💻' },
         { text: '解释一下这个概念', icon: '💡' }
       ];
-      var chipsHtml = '<div class="welcome-suggestions">';
+      let chipsHtml = '<div class="welcome-suggestions">';
       suggestions.forEach(function (s) {
         chipsHtml += '<span class="welcome-suggestion" data-prompt="' + escapeHtml(s.text) + '">' + escapeHtml(s.icon) + ' ' + escapeHtml(s.text) + '</span>';
       });
@@ -39,9 +39,9 @@ var WelcomeView = {
         + chipsHtml;
       welcome.querySelectorAll('.welcome-suggestion').forEach(function (el) {
         el.addEventListener('click', function () {
-          var prompt = this.getAttribute('data-prompt');
+          const prompt = this.getAttribute('data-prompt');
           if (!prompt) return;
-          var input = document.getElementById('input');
+          const input = document.getElementById('input');
           if (!input) return;
           input.value = prompt;
           input.focus();
@@ -55,17 +55,17 @@ var WelcomeView = {
   },
 
   hideWelcome: function () {
-    var welcome = document.getElementById('welcome');
-    var messages = document.getElementById('messages');
+    const welcome = document.getElementById('welcome');
+    const messages = document.getElementById('messages');
     if (welcome) welcome.classList.add('hidden');
     if (messages) { messages.style.display = ''; messages.scrollTop = 0; }
-    var sb = document.getElementById('scroll-bottom'); if (sb) sb.style.display = 'none';
+    const sb = document.getElementById('scroll-bottom'); if (sb) sb.style.display = 'none';
     WelcomeView.updateAgentModeBar();
   },
 
   updateAgentModeBar: function () {
-    var existing = document.getElementById('agent-mode-bar');
-    var mainEl = document.getElementById('main');
+    const existing = document.getElementById('agent-mode-bar');
+    const mainEl = document.getElementById('main');
 
     if (!State.currentAgent) {
       if (existing) existing.remove();
@@ -74,11 +74,11 @@ var WelcomeView = {
     if (!mainEl) return;
     if (existing) existing.remove();
 
-    var agent = State.findAgent(State.currentAgent);
-    var avatar = (agent && agent.avatar) || '🤖';
-    var displayName = (agent && agent.displayName) || (agent && agent.name) || State.currentAgent;
+    const agent = State.findAgent(State.currentAgent);
+    const avatar = (agent && agent.avatar) || '🤖';
+    const displayName = (agent && agent.displayName) || (agent && agent.name) || State.currentAgent;
 
-    var bar = document.createElement('div');
+    const bar = document.createElement('div');
     bar.id = 'agent-mode-bar';
     bar.innerHTML = ''
       + '<span class="agent-mode-avatar">' + renderAgentAvatar(avatar, displayName) + '</span>'

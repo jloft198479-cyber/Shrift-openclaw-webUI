@@ -81,15 +81,15 @@ function getAgentDetail(agentId, res) {
 
 function _extractTeamFromMd(md) {
   if (!md) return [];
-  var members = [];
-  var lines = md.split('\n');
-  var inTeamSection = false;
-  for (var i = 0; i < lines.length; i++) {
-    var line = lines[i];
+  const members = [];
+  const lines = md.split('\n');
+  let inTeamSection = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
     if (line.match(/^##\s+(Sub-Agents|Team Members)/)) { inTeamSection = true; continue; }
     if (inTeamSection && line.match(/^##\s/)) { inTeamSection = false; continue; }
     if (inTeamSection) {
-      var m = line.match(/^-\s+\*\*(.+?)\*\*\s+\((.+?)\)(?:\s+—\s+(.+))?$/);
+      const m = line.match(/^-\s+\*\*(.+?)\*\*\s+\((.+?)\)(?:\s+—\s+(.+))?$/);
       if (m) {
         members.push({ id: m[1], display: m[2], summary: m[3] || '' });
       }

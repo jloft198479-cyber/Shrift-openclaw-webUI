@@ -17,7 +17,7 @@
  *   unknown — 未知错误（Toast 提示）
  */
 
-var ErrorHandler = {
+const ErrorHandler = {
   /**
    * 处理错误
    *
@@ -30,8 +30,8 @@ var ErrorHandler = {
    */
   handle: function (error, context, options) {
     options = options || {};
-    var message = this._extractMessage(error);
-    var prefix = options.prefix || this._getDefaultPrefix(context);
+    const message = this._extractMessage(error);
+    const prefix = options.prefix || this._getDefaultPrefix(context);
 
     // 1. 记录日志
     this._log(error, context, message);
@@ -74,7 +74,7 @@ var ErrorHandler = {
    * @private
    */
   _getDefaultPrefix: function (context) {
-    var prefixes = {
+    const prefixes = {
       api: 'API 错误',
       chat: '错误',
       upload: '上传失败',
@@ -93,7 +93,7 @@ var ErrorHandler = {
    * @private
    */
   _log: function (error, context, message) {
-    var logMessage = '[ErrorHandler][' + context + '] ' + message;
+    const logMessage = '[ErrorHandler][' + context + '] ' + message;
     if (error instanceof Error && error.stack) {
       console.error(logMessage, error.stack);
     } else {

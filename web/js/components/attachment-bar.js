@@ -69,7 +69,7 @@ const AttachmentBar = {
     bar.querySelectorAll('.att-remove').forEach(function (btn) {
       btn.addEventListener('click', function () {
         const id = btn.dataset.id;
-        for (var j = 0; j < self.pendingAttachments.length; j++) {
+        for (let j = 0; j < self.pendingAttachments.length; j++) {
           if (self.pendingAttachments[j].id === id) {
             if (self.pendingAttachments[j].previewUrl) URL.revokeObjectURL(self.pendingAttachments[j].previewUrl);
             self.pendingAttachments.splice(j, 1);

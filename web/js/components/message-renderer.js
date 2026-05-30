@@ -23,10 +23,10 @@ function _getAgentColor(name) {
  * 构建 Agent 标签 HTML（消除重复代码）
  */
 function _buildAgentLabelHtml(agent, resolvedAgentName) {
-  var avatar = (agent && agent.avatar) || '';
-  var desc = (agent && agent.description) || '';
-  var agentAvatar = renderAgentAvatar(avatar || (resolvedAgentName ? resolvedAgentName.slice(0, 1) : ''), resolvedAgentName);
-  var html = '<span class="agent-label-avatar">' + agentAvatar + '</span>';
+  const avatar = (agent && agent.avatar) || '';
+  const desc = (agent && agent.description) || '';
+  const agentAvatar = renderAgentAvatar(avatar || (resolvedAgentName ? resolvedAgentName.slice(0, 1) : ''), resolvedAgentName);
+  let html = '<span class="agent-label-avatar">' + agentAvatar + '</span>';
   html += '<span class="agent-label-name">' + escapeHtml(resolvedAgentName) + '</span>';
   if (desc) {
     html += '<span class="agent-label-desc">' + escapeHtml(desc) + '</span>';
@@ -34,7 +34,7 @@ function _buildAgentLabelHtml(agent, resolvedAgentName) {
   return html;
 }
 
-var _ATTACHMENT_RE = /^[\U0001f5bc\U0001f4c4\U0001f4e6\U0001f4dd\U0001f4ca\U0001f4c3\U0001f4ce]\s+(.+)$/;
+const _ATTACHMENT_RE = /^[\u{1F5BC}\u{1F4C4}\u{1F4E6}\u{1F4DD}\u{1F4CA}\u{1F4C3}\u{1F4CE}]\s+(.+)$/u;
 function _parseAttachments(content) {
   if (!content) return { text: '', attachments: [] };
   const lines = content.split('\n');
@@ -327,12 +327,12 @@ const MessageRenderer = {
 
   updateBubbleContent: function (bubble, newContent) {
     if (!bubble) return;
-    var contentEl = bubble.querySelector('.agent-content');
+    const contentEl = bubble.querySelector('.agent-content');
     if (contentEl) {
       contentEl.innerHTML = renderMarkdown(newContent);
     }
     if (!bubble.querySelector('.msg-actions')) {
-      var actions = document.createElement('div');
+      const actions = document.createElement('div');
       actions.className = 'msg-actions';
       actions.innerHTML = '<button class="msg-act-btn" data-action="copy" title="复制">📋</button>';
       bubble.appendChild(actions);
@@ -352,5 +352,73 @@ const MessageRenderer = {
    */
   createMessageElement: function (role, content, streaming, thinking, agentId, attachmentMeta) {
     return _buildMessageElement(role, content, streaming, thinking, agentId, attachmentMeta);
+  },
+
+  /**
+   * 更新最后一条 assistant 消息的内容
+   * 用于 dispatch 模式 announce 结果合并——不创建新气泡，复用已有的最后一条
+   * @param {string} content - 新内容（Markdown）
+   * @param {string} agentId - Agent ID
+   * @returns {boolean} 是否找到并更新成功
+   */
+  updateLastAssistantMessage: function (content, agentId) {
+    const inner = document.querySelector('.messages-inner');
+    if (!inner) return false;
+    const messages = inner.querySelectorAll('.message.assistant');
+    if (messages.length === 0) return false;
+    const lastMsg = messages[messages.length - 1];
+    const bubble = lastMsg.querySelector('.bubble');
+    if (!bubble) return false;
+
+    // 更新 agent 标签
+    const resolvedAgentId = agentId || State.currentAgent || 'main';
+    const agent = State.findAgent(resolvedAgentId);
+    const displayName = (agent && agent.displayName) || APP_NAME;
+    const av = (agent && agent.avatar) || '';
+
+    // 更新头像颜色
+    const ac = _getAgentColor(displayName);
+    lastMsg.style.setProperty('--agent-color', ac);
+    const avatarDiv = lastMsg.querySelector('.avatar');
+    if (avatarDiv) {
+      avatarDiv.style.background = ac;
+      if (av) {
+        avatarDiv.innerHTML = renderAgentAvatar(av, displayName);
+      } else {
+        avatarDiv.innerHTML = '<img src="' + LOGO_SRC + '" alt="" class="avatar-logo-img">';
+      }
+    }
+
+    // 更新/添加 agent 标签
+    let label = lastMsg.querySelector('.agent-label');
+    if (label) {
+      label.innerHTML = _buildAgentLabelHtml(agent, displayName);
+    } else if (resolvedAgentId) {
+      label = document.createElement('div');
+      label.className = 'agent-label';
+      label.innerHTML = _buildAgentLabelHtml(agent, displayName);
+      bubble.insertBefore(label, bubble.firstChild);
+    }
+
+    // 更新内容
+    let contentEl = bubble.querySelector('.agent-content');
+    if (contentEl) {
+      contentEl.innerHTML = renderMarkdown(content);
+    } else {
+      contentEl = document.createElement('div');
+      contentEl.className = 'agent-content';
+      contentEl.innerHTML = renderMarkdown(content);
+      bubble.appendChild(contentEl);
+    }
+
+    // 确保有复制按钮
+    if (!bubble.querySelector('.msg-actions')) {
+      const actions = document.createElement('div');
+      actions.className = 'msg-actions';
+      actions.innerHTML = '<button class="msg-act-btn" data-action="copy" title="复制">📋</button>';
+      bubble.appendChild(actions);
+    }
+
+    return true;
   },
 };

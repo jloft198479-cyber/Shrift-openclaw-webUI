@@ -15,7 +15,7 @@
  *   VirtualList.scrollToBottom();
  */
 
-var VirtualList = {
+const VirtualList = {
   /** 容器元素 */
   _container: null,
   /** 内容元素 */
@@ -65,7 +65,7 @@ var VirtualList = {
     }
 
     // 绑定滚动事件
-    var self = this;
+    const self = this;
     container.addEventListener('scroll', function () {
       if (self._rafId) return;
       self._rafId = requestAnimationFrame(function () {
@@ -187,7 +187,7 @@ var VirtualList = {
     this._scrolling = true;
     clearTimeout(this._scrollEndTimer);
 
-    var self = this;
+    const self = this;
     this._scrollEndTimer = setTimeout(function () {
       self._scrolling = false;
     }, 150);
@@ -207,12 +207,12 @@ var VirtualList = {
       return;
     }
 
-    var scrollTop = this._container.scrollTop;
-    var clientHeight = this._container.clientHeight;
+    const scrollTop = this._container.scrollTop;
+    const clientHeight = this._container.clientHeight;
 
     // 计算可见区域起始位置
-    var startIndex = this._getIndexAtOffset(scrollTop);
-    var endIndex = this._getIndexAtOffset(scrollTop + clientHeight);
+    const startIndex = this._getIndexAtOffset(scrollTop);
+    const endIndex = this._getIndexAtOffset(scrollTop + clientHeight);
 
     // 添加缓冲区
     this._startIndex = Math.max(0, startIndex - this._bufferSize);
@@ -226,18 +226,18 @@ var VirtualList = {
    * @private
    */
   _getIndexAtOffset: function (offset) {
-    var low = 0;
-    var high = this._messages.length - 1;
-    var currentOffset = 0;
-    var midOffset = 0;
+    let low = 0;
+    let high = this._messages.length - 1;
+    let currentOffset = 0;
+    let midOffset = 0;
 
     while (low <= high) {
-      var mid = Math.floor((low + high) / 2);
+      const mid = Math.floor((low + high) / 2);
       midOffset = 0;
-      for (var i = 0; i < mid; i++) {
+      for (let i = 0; i < mid; i++) {
         midOffset += this._getMessageHeight(i);
       }
-      var midHeight = this._getMessageHeight(mid);
+      const midHeight = this._getMessageHeight(mid);
 
       if (midOffset + midHeight <= offset) {
         low = mid + 1;
@@ -271,9 +271,9 @@ var VirtualList = {
     if (!this._content) return;
     this._content.innerHTML = '';
 
-    for (var i = 0; i < this._messages.length; i++) {
-      var message = this._messages[i];
-      var el = this._createMessageElement(message);
+    for (let i = 0; i < this._messages.length; i++) {
+      const message = this._messages[i];
+      const el = this._createMessageElement(message);
       if (el) {
         this._content.appendChild(el);
         // 缓存高度
@@ -290,14 +290,14 @@ var VirtualList = {
     if (!this._content || this._messages.length === 0) return;
 
     // 计算总高度
-    var totalHeight = 0;
-    for (var i = 0; i < this._messages.length; i++) {
+    let totalHeight = 0;
+    for (let i = 0; i < this._messages.length; i++) {
       totalHeight += this._getMessageHeight(i);
     }
 
     // 计算可见区域上方的高度
-    var topHeight = 0;
-    for (var i = 0; i < this._startIndex; i++) {
+    let topHeight = 0;
+    for (let i = 0; i < this._startIndex; i++) {
       topHeight += this._getMessageHeight(i);
     }
 
@@ -306,15 +306,15 @@ var VirtualList = {
 
     // 创建上方占位元素
     if (topHeight > 0) {
-      var topSpacer = document.createElement('div');
+      const topSpacer = document.createElement('div');
       topSpacer.style.height = topHeight + 'px';
       this._content.appendChild(topSpacer);
     }
 
     // 渲染可见区域的消息
-    for (var i = this._startIndex; i <= this._endIndex && i < this._messages.length; i++) {
-      var message = this._messages[i];
-      var el = this._createMessageElement(message);
+    for (let i = this._startIndex; i <= this._endIndex && i < this._messages.length; i++) {
+      const message = this._messages[i];
+      const el = this._createMessageElement(message);
       if (el) {
         this._content.appendChild(el);
         // 缓存高度
@@ -323,12 +323,12 @@ var VirtualList = {
     }
 
     // 创建下方占位元素
-    var bottomHeight = totalHeight - topHeight;
-    for (var i = this._startIndex; i <= this._endIndex && i < this._messages.length; i++) {
+    let bottomHeight = totalHeight - topHeight;
+    for (let i = this._startIndex; i <= this._endIndex && i < this._messages.length; i++) {
       bottomHeight -= this._getMessageHeight(i);
     }
     if (bottomHeight > 0) {
-      var bottomSpacer = document.createElement('div');
+      const bottomSpacer = document.createElement('div');
       bottomSpacer.style.height = bottomHeight + 'px';
       this._content.appendChild(bottomSpacer);
     }
@@ -356,18 +356,18 @@ var VirtualList = {
     }
 
     // 降级方案：简单创建消息元素
-    var div = document.createElement('div');
+    const div = document.createElement('div');
     div.className = 'message ' + (message.role || 'assistant');
 
-    var avatar = document.createElement('div');
+    const avatar = document.createElement('div');
     avatar.className = 'avatar';
     avatar.textContent = message.role === 'user' ? '你' : 'AI';
     div.appendChild(avatar);
 
-    var bubble = document.createElement('div');
+    const bubble = document.createElement('div');
     bubble.className = 'bubble';
 
-    var contentEl = document.createElement('div');
+    const contentEl = document.createElement('div');
     contentEl.className = 'agent-content';
     contentEl.textContent = message.content || '';
     bubble.appendChild(contentEl);
@@ -384,7 +384,7 @@ var VirtualList = {
   _appendMessageToDOM: function (message) {
     if (!this._content) return;
 
-    var el = this._createMessageElement(message);
+    const el = this._createMessageElement(message);
     if (el) {
       this._content.appendChild(el);
       // 缓存高度

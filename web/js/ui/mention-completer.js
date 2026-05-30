@@ -43,7 +43,7 @@ function _showMentionPopup(input, atPos) {
   }
 
   popup.innerHTML = filtered.map(function (a) {
-    var dn = a.displayName || a.name || a.id;
+    const dn = a.displayName || a.name || a.id;
     return '<div class="mention-item" data-agent-id="' + escapeHtml(a.id) + '" data-agent-name="' + escapeHtml(dn) + '">'
       + '<span class="mention-icon">' + renderAgentAvatar(a.avatar, dn) + '</span>'
       + '<span class="mention-name">' + escapeHtml(dn) + '</span>'
@@ -76,29 +76,29 @@ function _hideMentionPopup() {
 
 function _applyMention(input, atPos, agentId, agentName) {
   _hideMentionPopup();
-  var before = input.value.substring(0, atPos);
-  var after = input.value.substring(input.selectionStart);
+  const before = input.value.substring(0, atPos);
+  const after = input.value.substring(input.selectionStart);
   input.value = before + '@' + agentName + ' ' + after;
   State.setState({ currentAgent: agentId, interactionMode: 'direct' });
   _updateDirectChatBadge(agentName);
   input.focus();
-  var newPos = before.length + agentName.length + 2;
+  const newPos = before.length + agentName.length + 2;
   input.setSelectionRange(newPos, newPos);
   autoResize();
 }
 
 function _updateDirectChatBadge(agentName) {
-  var badge = document.getElementById('delegate-badge');
+  let badge = document.getElementById('delegate-badge');
   if (!badge) {
     badge = document.createElement('div');
     badge.id = 'delegate-badge';
-    var inputWrap = document.querySelector('.input-wrap');
+    const inputWrap = document.querySelector('.input-wrap');
     if (inputWrap && inputWrap.parentNode) {
       inputWrap.parentNode.insertBefore(badge, inputWrap);
     }
   }
-  var agent = State.findAgent(State.currentAgent || '');
-  var av = (agent && agent.avatar) || '';
+  const agent = State.findAgent(State.currentAgent || '');
+  const av = (agent && agent.avatar) || '';
   badge.innerHTML = '<span class="delegate-badge-avatar">' + renderAgentAvatar(av || agentName.slice(0, 1), agentName) + '</span>'
     + '<span class="delegate-badge-text">与 <strong>' + escapeHtml(agentName) + '</strong> 对话中</span>'
     + '<span class="delegate-badge-close" title="取消">&times;</span>';
@@ -110,9 +110,9 @@ function _updateDirectChatBadge(agentName) {
 
 function cancelDirectChatMode() {
   State.setState({ currentAgent: '', interactionMode: 'dispatch' });
-  var badge = document.getElementById('delegate-badge');
+  const badge = document.getElementById('delegate-badge');
   if (badge) badge.style.display = 'none';
-  var input = document.getElementById('input');
+  const input = document.getElementById('input');
   if (input) input.focus();
 }
 

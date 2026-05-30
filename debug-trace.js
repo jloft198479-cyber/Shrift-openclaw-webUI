@@ -23,12 +23,12 @@ function _timestamp() {
 
 function _writeLine(line) {
   try {
-    var stat;
+    let stat;
     try { stat = fs.statSync(LOG_FILE); } catch (e) { stat = null; }
     if (stat && stat.size > MAX_LOG_SIZE) {
-      var content = fs.readFileSync(LOG_FILE, 'utf8');
-      var lines = content.split('\n');
-      var keep = lines.slice(Math.floor(lines.length / 2));
+      const content = fs.readFileSync(LOG_FILE, 'utf8');
+      const lines = content.split('\n');
+      const keep = lines.slice(Math.floor(lines.length / 2));
       fs.writeFileSync(LOG_FILE, keep.join('\n'), 'utf8');
     }
     fs.appendFileSync(LOG_FILE, line + '\n', 'utf8');
@@ -38,7 +38,7 @@ function _writeLine(line) {
 }
 
 function trace(type, data) {
-  var entry = {
+  const entry = {
     ts: _timestamp(),
     src: 'backend',
     type: type,
@@ -48,7 +48,7 @@ function trace(type, data) {
 }
 
 function traceFrontend(type, data) {
-  var entry = {
+  const entry = {
     ts: _timestamp(),
     src: 'frontend',
     type: type,
@@ -83,7 +83,7 @@ function handlePostLog(req, res, collectBody) {
 }
 
 function handleGetLogs(req, res) {
-  var logs = getLogs();
+  const logs = getLogs();
   res.writeHead(200, {
     'Content-Type': 'text/plain; charset=utf-8',
     'Cache-Control': 'no-cache'

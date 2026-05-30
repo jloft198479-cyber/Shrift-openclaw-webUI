@@ -106,7 +106,7 @@ const StreamRenderer = {
     }
     State.setState({ streaming: true });
     this.showStopBtn();
-    var ti = document.getElementById('thinking-indicator');
+    const ti = document.getElementById('thinking-indicator');
     if (ti) ti.style.display = 'flex';
     this._pendingCleanup = cleanupFn || null;
   },

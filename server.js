@@ -112,34 +112,78 @@ try {
     sseManager.broadcast({ type: 'status', ws: 'disconnected' });
   });
 
-  function _broadcastSubagentProgress(agentId, toolName) {
+  function _broadcastSubagentProgress(agentId, toolName, sessionId) {
     if (!agentId || agentId === 'main') return;
-    debugTrace.trace('subagent-progress-broadcast', { agentId: agentId, toolName: toolName });
-    var _progress = {};
-    _progress[agentId] = { toolName: toolName };
+    debugTrace.trace('subagent-progress-broadcast', { agentId: agentId, toolName: toolName, sessionId: sessionId || '' });
+    const _progress = {};
+    _progress[agentId] = { toolName: toolName, sessionId: sessionId || '' };
     sseManager.broadcast({
       type: 'subagent-progress',
       progress: _progress
     });
   }
 
+  function _broadcastSubagentDone(agentId, sessionId) {
+    if (!agentId || agentId === 'main') return;
+    debugTrace.trace('subagent-done-broadcast', { agentId: agentId, sessionId: sessionId || '' });
+    sseManager.broadcast({
+      type: 'subagent-done',
+      agentId: agentId,
+      sessionId: sessionId || ''
+    });
+  }
+
+  function _extractFrontendSessionId(sessionKey) {
+    if (!sessionKey || sessionKey.indexOf(':webui:') < 0) return '';
+    const idx = sessionKey.indexOf(':webui:');
+    return sessionKey.substring(idx + 7);
+  }
+
   wsClient.emitter.on('event', function (data) {
     sseManager.broadcast({ type: 'gateway', data: data });
     sessionSync.onSubagentGatewayEvent(data);
-    var eventName = data.event || '';
-    var payload = data.payload || {};
-    var sessionKey = payload.sessionKey || '';
+    const eventName = data.event || '';
+    const payload = data.payload || {};
+    const sessionKey = payload.sessionKey || '';
     debugTrace.trace('gateway-event', { event: eventName, sessionKey: sessionKey, data: JSON.stringify(payload).substring(0, 500) });
     if ((eventName === 'session.tool' || eventName === 'agent') && payload) {
-      var d = payload.data || {};
+      let d = payload.data || {};
       if (typeof d === 'string') {
         try { d = JSON.parse(d); } catch (e) { d = {}; }
       }
-      var toolData = d.data || {};
-      var isToolStart = toolData.phase === 'start' && toolData.name;
-      if (isToolStart) {
-        var agentId = (sessionKey || '').split(':')[1] || '';
-        _broadcastSubagentProgress(agentId, toolData.name);
+      // 子 Agent 的工具事件可能通过 spawnedBy 或 d.sessionKey 传递
+      let subAgentId = '';
+      const dataSessionKey = d.sessionKey || '';
+      if (dataSessionKey && dataSessionKey.indexOf(':subagent:') >= 0) {
+        subAgentId = dataSessionKey.split(':')[1] || '';
+      }
+      if (!subAgentId && d.spawnedBy) {
+        const spawnedParts = d.spawnedBy.split(':');
+        if (spawnedParts.length >= 2 && spawnedParts[1] !== 'main') subAgentId = spawnedParts[1];
+      }
+      if (!subAgentId) {
+        const topSK = payload.sessionKey || '';
+        if (topSK.indexOf(':subagent:') >= 0) subAgentId = topSK.split(':')[1] || '';
+      }
+      const toolData = d.data || {};
+      const isToolStart = toolData.phase === 'start' && toolData.name;
+      if (isToolStart && subAgentId) {
+        _broadcastSubagentProgress(subAgentId, toolData.name);
+      }
+    }
+    if (eventName === 'sessions.changed' && sessionKey.indexOf(':subagent:') >= 0) {
+      let d = payload.data || {};
+      if (typeof d === 'string') {
+        try { d = JSON.parse(d); } catch (e) { d = {}; }
+      }
+      const agentId = (sessionKey || '').split(':')[1] || '';
+      const sessionData = d.session || {};
+      const parentKey = d.spawnedBy || sessionData.spawnedBy || '';
+      const sessionId = _extractFrontendSessionId(parentKey);
+      if (d.phase === 'start' || d.reason === 'create') {
+        _broadcastSubagentProgress(agentId, '', sessionId);
+      } else if (d.phase === 'end' || d.phase === 'error' || d.reason === 'delete') {
+        _broadcastSubagentDone(agentId, sessionId);
       }
     }
   });

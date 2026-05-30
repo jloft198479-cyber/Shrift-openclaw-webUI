@@ -12,7 +12,7 @@
  *   await LazyLoader.load('js/components/agent-modal.js');
  */
 
-var LazyLoader = {
+const LazyLoader = {
   /** 已加载的脚本缓存 */
   _loaded: new Map(),
 
@@ -28,7 +28,7 @@ var LazyLoader = {
    */
   load: function (url, options) {
     options = options || {};
-    var cache = options.cache !== false;
+    const cache = options.cache !== false;
 
     // 如果已加载，直接返回
     if (cache && this._loaded.has(url)) {
@@ -41,9 +41,9 @@ var LazyLoader = {
     }
 
     // 创建新的加载 Promise
-    var self = this;
-    var promise = new Promise(function (resolve, reject) {
-      var script = document.createElement('script');
+    const self = this;
+    const promise = new Promise(function (resolve, reject) {
+      const script = document.createElement('script');
       script.src = url;
       script.async = true;
 
@@ -73,8 +73,8 @@ var LazyLoader = {
    * @returns {Promise<void[]>} 加载完成的 Promise
    */
   loadAll: function (urls) {
-    var promises = [];
-    for (var i = 0; i < urls.length; i++) {
+    const promises = [];
+    for (let i = 0; i < urls.length; i++) {
       promises.push(this.load(urls[i]));
     }
     return Promise.all(promises);
@@ -89,7 +89,7 @@ var LazyLoader = {
       return;
     }
 
-    var link = document.createElement('link');
+    const link = document.createElement('link');
     link.rel = 'prefetch';
     link.href = url;
     link.as = 'script';

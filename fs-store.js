@@ -54,11 +54,14 @@ function readConfig() {
 
 function writeConfig(data) {
   if (!OPENCLAW_CONFIG) return false;
+  const tmpPath = OPENCLAW_CONFIG + '.tmp';
   try {
-    fs.writeFileSync(OPENCLAW_CONFIG, JSON.stringify(data, null, 2), 'utf8');
+    fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf8');
+    fs.renameSync(tmpPath, OPENCLAW_CONFIG);
     return true;
   } catch (e) {
     console.error('[FS] Cannot write openclaw.json:', e.message);
+    try { if (fs.existsSync(tmpPath)) fs.unlinkSync(tmpPath); } catch (_) {}
     return false;
   }
 }

@@ -11,7 +11,7 @@
  * 向后兼容：保留全局函数别名，逐步迁移到 Utils.xxx
  */
 
-var Utils = {
+const Utils = {
   /* ── 常量 ────────────────────────────────────────────── */
   APP_NAME: '虾指挥',
   LOGO_SRC: 'logo.svg',
@@ -25,7 +25,7 @@ var Utils = {
    */
   escapeHtml: function (str) {
     if (!str) return '';
-    var escMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+    const escMap = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
     return String(str).replace(/[&<>"']/g, function (ch) { return escMap[ch]; });
   },
 
@@ -46,14 +46,14 @@ var Utils = {
    */
   fmtDate: function (ts) {
     if (!ts) return '';
-    var d = new Date(ts);
+    const d = new Date(ts);
     if (isNaN(d.getTime())) return '';
-    var now = new Date();
-    var diff = now - d;
+    const now = new Date();
+    const diff = now - d;
     if (diff < 60000) return '刚刚';
     if (diff < 3600000) return Math.floor(diff / 60000) + '分钟前';
     if (diff < 86400000) return Math.floor(diff / 3600000) + '小时前';
-    var opts = { month: 'short', day: 'numeric' };
+    const opts = { month: 'short', day: 'numeric' };
     if (d.getFullYear() !== now.getFullYear()) opts.year = 'numeric';
     return d.toLocaleDateString('zh-CN', opts);
   },
@@ -90,19 +90,19 @@ var Utils = {
   createElement: function (tag, attrs, children) {
     attrs = attrs || {};
     children = children || [];
-    var el = document.createElement(tag);
-    var entries = Object.entries(attrs);
-    for (var i = 0; i < entries.length; i++) {
-      var k = entries[i][0];
-      var v = entries[i][1];
+    const el = document.createElement(tag);
+    const entries = Object.entries(attrs);
+    for (let i = 0; i < entries.length; i++) {
+      const k = entries[i][0];
+      const v = entries[i][1];
       if (k === 'className') el.className = v;
       else if (k === 'style' && typeof v === 'object') Object.assign(el.style, v);
       else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
       else if (k === 'innerHTML') el.innerHTML = v;
       else el.setAttribute(k, v);
     }
-    for (var j = 0; j < children.length; j++) {
-      var child = children[j];
+    for (let j = 0; j < children.length; j++) {
+      const child = children[j];
       if (child != null) el.append(typeof child === 'string' ? document.createTextNode(child) : child);
     }
     return el;
@@ -125,7 +125,7 @@ var Utils = {
       return;
     }
     if (this._scrollRafId) return;
-    var self = this;
+    const self = this;
     this._scrollRafId = requestAnimationFrame(function () {
       self._scrollRafId = null;
       el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
@@ -136,7 +136,7 @@ var Utils = {
    * 输入框自动调整高度
    */
   autoResize: function () {
-    var el = document.getElementById('input');
+    const el = document.getElementById('input');
     if (!el) return;
     el.style.height = 'auto';
     el.style.height = Math.min(el.scrollHeight, 160) + 'px';
@@ -181,7 +181,7 @@ var Utils = {
    * @returns {string} HTML 字符串
    */
   renderAgentAvatar: function (avatar, name) {
-    var icon = avatar || '🤖';
+    const icon = avatar || '🤖';
     if (typeof icon === 'string' && this._isImageAvatar(icon)) {
       return '<img src="' + icon + '" alt="" class="agent-avatar-img">';
     }
@@ -194,7 +194,7 @@ var Utils = {
    * @returns {Array} 标准化后的列表
    */
   normalizeAgents: function (rawList) {
-    var self = this;
+    const self = this;
     return (rawList || []).map(function (a) {
       return Object.assign({}, a, {
         displayName: a.id === 'main' ? self.APP_NAME : (a.name || a.id),
@@ -214,7 +214,7 @@ var Utils = {
    */
   highlightMentions: function (text) {
     if (!text) return '';
-    var safe = this.escapeHtml(text);
+    const safe = this.escapeHtml(text);
     return safe.replace(this._MENTION_RE, '<span class="mention-chip">@$1</span>');
   },
 
@@ -227,12 +227,12 @@ var Utils = {
    * @param {string} [type='default'] - 类型（default/info/error/success）
    */
   showToast: function (msg, duration, type) {
-    var t = document.querySelector('.toast');
+    let t = document.querySelector('.toast');
     if (!t) {
       t = this.createElement('div', { className: 'toast' });
       document.body.appendChild(t);
     }
-    var typeClass = type ? 'toast-' + type : 'toast-default';
+    const typeClass = type ? 'toast-' + type : 'toast-default';
     t.className = 'toast ' + typeClass;
     t.textContent = msg;
     t.style.display = '';
@@ -271,7 +271,7 @@ var Utils = {
    * @private
    */
   _fallbackCopy: function (text, onSuccess, onError) {
-    var ta = document.createElement('textarea');
+    const ta = document.createElement('textarea');
     ta.value = text;
     ta.style.cssText = 'position:fixed;left:-9999px';
     document.body.appendChild(ta);
@@ -289,15 +289,15 @@ var Utils = {
 // ── 向后兼容：保留全局函数别名 ──────────────────────────────
 // 这些别名允许现有代码继续工作，逐步迁移到 Utils.xxx
 
-var APP_NAME = Utils.APP_NAME;
-var LOGO_SRC = Utils.LOGO_SRC;
+const APP_NAME = Utils.APP_NAME;
+const LOGO_SRC = Utils.LOGO_SRC;
 
 function escapeHtml(str) { return Utils.escapeHtml(str); }
 function uid() { return Utils.uid(); }
 function fmtDate(ts) { return Utils.fmtDate(ts); }
 
-var $ = Utils.$;
-var $$ = Utils.$$;
+const $ = Utils.$;
+const $$ = Utils.$$;
 function createElement(tag, attrs, children) { return Utils.createElement(tag, attrs, children); }
 
 function scrollToBottom(el, smooth) { return Utils.scrollToBottom(el, smooth); }

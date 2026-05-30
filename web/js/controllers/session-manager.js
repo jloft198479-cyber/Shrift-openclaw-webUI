@@ -44,12 +44,12 @@ const SessionStore = {
   },
 
   _evictOldSessions: function () {
-    var keys = [];
-    for (var i = 0; i < localStorage.length; i++) {
-      var key = localStorage.key(i);
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
       if (key && key.indexOf('openclaw_session_') === 0) {
         try {
-          var data = JSON.parse(localStorage.getItem(key));
+          const data = JSON.parse(localStorage.getItem(key));
           keys.push({ key: key, updatedAt: data.updatedAt || 0 });
         } catch (e) {
           keys.push({ key: key, updatedAt: 0 });
@@ -57,8 +57,8 @@ const SessionStore = {
       }
     }
     keys.sort(function (a, b) { return a.updatedAt - b.updatedAt; });
-    var toRemove = Math.max(1, Math.floor(keys.length / 4));
-    for (var j = 0; j < toRemove && j < keys.length; j++) {
+    const toRemove = Math.max(1, Math.floor(keys.length / 4));
+    for (let j = 0; j < toRemove && j < keys.length; j++) {
       localStorage.removeItem(keys[j].key);
     }
   },
@@ -85,7 +85,7 @@ const SessionStore = {
   remove: function (id) {
     if (!id) return;
     this._removeLocalCache(id);
-    var self = this;
+    const self = this;
     fetch('/api/sessions/' + id, { method: 'DELETE' })
       .then(function () { self._refreshList(); })
       .catch(function (e) {
@@ -211,7 +211,7 @@ const SessionManager = {
       const lastMsg = inner && inner.lastElementChild;
       if (lastMsg) {
         lastMsg.className = 'message history-placeholder';
-        lastMsg.innerHTML = '<div class="bubble" style="text-align:center;color:var(--text-3);font-size:12px;background:transparent;border:none;box-shadow:none">... 早期消息（' + startIdx + ' 条）</div>';
+        lastMsg.innerHTML = '<div class="bubble" style="text-align:center;color:var(--muted);font-size:12px;background:transparent;border:none;box-shadow:none">... 早期消息（' + startIdx + ' 条）</div>';
         lastMsg.dataset.placeholder = 'true';
       }
     }

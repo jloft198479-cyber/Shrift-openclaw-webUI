@@ -134,7 +134,7 @@ module.exports = {
     }
 
     function handleSessionSync(id, req, res) {
-      var messages = sessionSync.readGatewayAssistantMessages();
+      const messages = sessionSync.readGatewayAssistantMessages();
       _jsonRes(res, 200, { success: true, messages: messages });
     }
 
@@ -169,23 +169,23 @@ module.exports = {
     function handleSetupDetect(req, res) {
       collectBody(req, function (b, _r, err) {
         if (err) { _jsonRes(res, 500, { error: err.message }); return; }
-        var candidates = [];
+        const candidates = [];
         if (b && b.path) { candidates.push(b.path); }
         if (process.env.APPDATA) candidates.push(path.join(process.env.APPDATA, 'openclaw', 'openclaw.json'));
         if (process.env.LOCALAPPDATA) candidates.push(path.join(process.env.LOCALAPPDATA, 'openclaw', 'openclaw.json'));
         if (process.env.USERPROFILE) candidates.push(path.join(process.env.USERPROFILE, '.openclaw', 'openclaw.json'));
         if (process.env.HOME) candidates.push(path.join(process.env.HOME, '.openclaw', 'openclaw.json'));
-        var found = null;
-        for (var ci = 0; ci < candidates.length; ci++) {
+        let found = null;
+        for (let ci = 0; ci < candidates.length; ci++) {
           try {
             if (fs.existsSync(candidates[ci])) { found = candidates[ci]; break; }
           } catch (ex) {}
         }
         if (found) {
           try {
-            var data = JSON.parse(fs.readFileSync(found, 'utf8'));
-            var gw = data.gateway || {};
-            var providers = data.models && data.models.providers ? Object.keys(data.models.providers) : [];
+            const data = JSON.parse(fs.readFileSync(found, 'utf8'));
+            const gw = data.gateway || {};
+            const providers = data.models && data.models.providers ? Object.keys(data.models.providers) : [];
             _jsonRes(res, 200, { found: true, path: found, port: gw.port || 18789, token: (gw.auth && gw.auth.token) || 'hermes-local-dev', providers: providers });
           } catch (ex) { _jsonRes(res, 200, { found: false }); }
         } else {
@@ -198,7 +198,7 @@ module.exports = {
       collectBody(req, function (b, _r, err) {
         if (err) { _jsonRes(res, 500, { error: err.message }); return; }
         if (!b || !b.path) { _jsonRes(res, 400, { error: 'Missing path' }); return; }
-        var r = _verifyConfigPath(b.path);
+        const r = _verifyConfigPath(b.path);
         _jsonRes(res, r.valid ? 200 : 400, r.valid ? { valid: true, info: r.info } : { valid: false, error: r.error });
       });
     }
@@ -209,15 +209,15 @@ module.exports = {
       { method: 'GET',    pattern: /^\/api\/skills$/,                     handler: function (m, req, res) { agentRoutes.listSkills(res); } },
       { method: 'GET',    pattern: /^\/api\/models$/,                     handler: function (m, req, res) { agentRoutes.listModels(res); } },
       { method: 'PUT',    pattern: /^\/api\/models\/default$/,            handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } agentRoutes.updateDefaultModel(b, res); }); } },
-      { method: 'GET',    pattern: /^\/api\/agents\/([^\/]+)$/,           handler: function (m, req, res) { agentRoutes.getAgentDetail(m[1], res); } },
-      { method: 'PUT',    pattern: /^\/api\/agents\/([^\/]+)$/,           handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } agentRoutes.updateAgent(m[1], b, res); }); } },
-      { method: 'DELETE', pattern: /^\/api\/agents\/([^\/]+)$/,           handler: function (m, req, res) { agentRoutes.deleteAgent(m[1], res); } },
-      { method: 'GET',    pattern: /^\/api\/agents\/([^\/]+)\/agents-md$/,handler: function (m, req, res) { agentRoutes.getAgentsMd(m[1], res); } },
-      { method: 'PUT',    pattern: /^\/api\/agents\/([^\/]+)\/agents-md$/,handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } agentRoutes.putAgentsMd(m[1], b, res); }); } },
-      { method: 'DELETE', pattern: /^\/api\/agents\/([^\/]+)\/bootstrap$/,handler: function (m, req, res) { agentRoutes.deleteBootstrap(m[1], res); } },
-      { method: 'GET',    pattern: /^\/api\/agents\/([^\/]+)\/skills$/,   handler: function (m, req, res) { agentRoutes.getAgentSkills(m[1], res); } },
-      { method: 'POST',   pattern: /^\/api\/agents\/([^\/]+)\/skills$/,   handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } agentRoutes.handleSkillAction(m[1], b, res); }); } },
-      { method: 'PUT',    pattern: /^\/api\/agents\/([^\/]+)\/skills$/,   handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } agentRoutes.syncSkills(m[1], b, res); }); } },
+      { method: 'GET',    pattern: /^\/api\/agents\/([^\/]+)$/,           handler: function (m, req, res) { agentRoutes.getAgentDetail(decodeURIComponent(m[1]), res); } },
+      { method: 'PUT',    pattern: /^\/api\/agents\/([^\/]+)$/,           handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } agentRoutes.updateAgent(decodeURIComponent(m[1]), b, res); }); } },
+      { method: 'DELETE', pattern: /^\/api\/agents\/([^\/]+)$/,           handler: function (m, req, res) { agentRoutes.deleteAgent(decodeURIComponent(m[1]), res); } },
+      { method: 'GET',    pattern: /^\/api\/agents\/([^\/]+)\/agents-md$/,handler: function (m, req, res) { agentRoutes.getAgentsMd(decodeURIComponent(m[1]), res); } },
+      { method: 'PUT',    pattern: /^\/api\/agents\/([^\/]+)\/agents-md$/,handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } agentRoutes.putAgentsMd(decodeURIComponent(m[1]), b, res); }); } },
+      { method: 'DELETE', pattern: /^\/api\/agents\/([^\/]+)\/bootstrap$/,handler: function (m, req, res) { agentRoutes.deleteBootstrap(decodeURIComponent(m[1]), res); } },
+      { method: 'GET',    pattern: /^\/api\/agents\/([^\/]+)\/skills$/,   handler: function (m, req, res) { agentRoutes.getAgentSkills(decodeURIComponent(m[1]), res); } },
+      { method: 'POST',   pattern: /^\/api\/agents\/([^\/]+)\/skills$/,   handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } agentRoutes.handleSkillAction(decodeURIComponent(m[1]), b, res); }); } },
+      { method: 'PUT',    pattern: /^\/api\/agents\/([^\/]+)\/skills$/,   handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } agentRoutes.syncSkills(decodeURIComponent(m[1]), b, res); }); } },
       { method: 'DELETE', pattern: /^\/api\/skills\/([^\/]+)$/,          handler: function (m, req, res) { agentRoutes.deleteSkill(decodeURIComponent(m[1]), res); } },
       { method: 'POST',   pattern: /^\/api\/upload$/,                     handler: function (m, req, res) { handleUpload(req, res); } },
       { method: 'GET',    pattern: /^\/api\/events$/,                     handler: function (m, req, res) { sseManager.handleSSE(req, res); } },
