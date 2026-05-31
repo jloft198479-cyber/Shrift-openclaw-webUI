@@ -389,6 +389,24 @@ openclaw gateway
 cd F:\fzz-Project\openclaw-web-ui\; node server.js
 ```
 
+### 关键经验记录 — roster-sync 写入 AGENTS.md 冗余验证
+
+**日期**：2026-05-31
+**背景**：roster-sync 每次创建/更新/删除 Agent 时都会重写主 Agent 的 AGENTS.md，补充 `## Sub-Agents` 和 `## @Mention Handling Rules` 段落。
+**问题**：每次写入会触发 OpenClaw 重新构建 system prompt，即使内容不变也会破坏 LLM provider 的 prefix cache。
+
+**优化方案 B（已实施）**：
+- 完全移除 roster-sync 对 AGENTS.md 的写入功能
+- 保留 skill link 同步和 allowAgents 引用完整性校验
+- 删除 `_extractSection`、`_readAgentSummary`、`_isEmojiChar`、`_toThirdPerson`、`_buildSubAgentsSection`、`_buildMentionRulesSection`、`_buildTeamMembersSection`、`_buildSkillUsageSection`、`_extractSkillCommands` 共 9 个冗余函数（~200 行）
+
+**验证结果**：在 AGENTS.md 无 Sub-Agents 段落的情况下，dispatch 模式 6 角色协作完整跑通：
+- 5 次 `sessions_spawn` 全部成功（小李子→咪蒙→小周→咪蒙→小王）
+- announce 回传全部正常
+- `cacheRead` 最高达 32,768 tokens，缓存持续命中
+
+**结论**：OpenClaw 的原生 `sessions_spawn` 发现机制不依赖 AGENTS.md 中的子 Agent 列表，写入是冗余的。
+
 ### 后续待验证
 
 1. @子Agent 直连路径 — `onAgentSwitch` 回调正常
