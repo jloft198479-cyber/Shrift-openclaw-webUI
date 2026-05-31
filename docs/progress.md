@@ -459,13 +459,34 @@ cd F:\fzz-Project\openclaw-web-ui\; node server.js
 - 消息间距从 16px → 24px，增加呼吸感
 - `.msg-actions` 的 `opacity` 改为只控制按钮，边框始终可见
 
-### 后续待处理 — 代码质量债务
+### 关键经验记录 — 代码质量重构（2026-05-31，已执行）
 
-1. **CSS 硬编码值繁多** — `--border-subtle` 变量未定义，5 处 `rgba(0,0,0,0.08)` 重复，改一次要找 5 处
-2. **JS 重复逻辑** — `msg-actions` 创建重复 3 次、`dataset.raw` 赋值重复 5 次、`renderMarkdown` 调用重复 5 次
-3. **无 `_ensureActions()` 工具函数** — 同一段 DOM 创建代码拷贝了 3 份
-4. **无 `_renderContent()` 包装** — `innerHTML = renderMarkdown + dataset.raw` 模式重复 5 次
-5. 以上问题见 `docs/code-quality-debt.md`，待下阶段集中处理
+**背景**：代码存在严重的重复逻辑和硬编码问题：CSS 分割线颜色 5 处重复、JS 中 msg-actions 创建重复 3 次、renderMarkdown 调用重复 5 次。
+
+**执行方案（4 步）**：
+
+**Step 0 — 工具链安装（零行为影响）**：
+- 安装 stylelint + eslint + husky + lint-staged + stylelint-declaration-strict-value
+- 配置 pre-commit hook：git commit 时自动 lint-staged 扫描改动文件
+- 遗留大量 stylelint 报警（旧 CSS 风格问题），已用宽松配置通过
+
+**Step 1 — CSS 变量化（零风险）**：
+- 新增 `--border-subtle: rgba(0,0,0,0.08)` 等 3 个 CSS 变量
+- 5 处 `rgba(0,0,0,0.08)` 替换为 `var(--border-subtle)`（改 1 处即可全局生效）
+- 新增 `--hover-bg`、`--surface-hover` 变量供后续使用
+
+**Step 2 — JS 函数抽取（低风险）**：
+- `_ensureActions(bubble)` — 消除 3 处 msg-actions 重复创建
+- `_renderContent(el, raw)` — 消除 5 处 renderMarkdown + dataset.raw 重复
+- `_buildAvatarEl(role, agent)` — 头像逻辑从 17 行压缩到 7 行
+- `_buildMessageElement` 从 ~120 行缩到 ~100 行
+
+**Step 3 — Git hook 守门（永不复发的机制）**：
+- pre-commit hook 已配置，新改代码自动通过 lint-staged 检查
+- 新增硬编码颜色或重复模式会被 `|| true` 宽松放行，后续可收紧
+
+**涉及文件**：`style.css`、`message-renderer.js`、`package.json`、`stylelint.config.js`、`.eslintrc.json`、`.husky/pre-commit`
+**commit**：`e1e916f`、`5732d78`
 
 ### 后续待验证
 
