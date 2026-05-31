@@ -35,6 +35,39 @@ function _buildAgentLabelHtml(agent, resolvedAgentName) {
   return html;
 }
 
+function _ensureActions(bubble) {
+  if (bubble.querySelector('.msg-actions')) return;
+  const actions = document.createElement('div');
+  actions.className = 'msg-actions';
+  actions.innerHTML = '<button class="msg-act-btn" data-action="copy" title="复制">📋</button>';
+  bubble.appendChild(actions);
+}
+
+function _renderContent(el, raw) {
+  el.innerHTML = renderMarkdown(raw);
+  el.dataset.raw = raw;
+}
+
+function _buildAvatarEl(role, agent) {
+  const avatar = document.createElement('div');
+  avatar.className = 'avatar';
+  const name = (agent && agent.displayName) || APP_NAME;
+  if (role === 'assistant' && name) {
+    const av = (agent && agent.avatar) || '';
+    const ac = _getAgentColor(name);
+    avatar.style.background = ac;
+    avatar.innerHTML = av ? renderAgentAvatar(av, name) : '<img src="' + LOGO_SRC + '" alt="" class="avatar-logo-img">';
+    return { el: avatar, color: ac };
+  }
+  if (role === 'assistant') {
+    avatar.style.background = 'linear-gradient(135deg, var(--accent), var(--accent-hover))';
+    avatar.innerHTML = '<img src="' + LOGO_SRC + '" alt="" class="avatar-logo-img">';
+  } else {
+    avatar.textContent = '你';
+  }
+  return { el: avatar, color: null };
+}
+
 const _ATTACHMENT_RE = /^[\u{1F5BC}\u{1F4C4}\u{1F4E6}\u{1F4DD}\u{1F4CA}\u{1F4C3}\u{1F4CE}]\s+(.+)$/u;
 function _parseAttachments(content) {
   if (!content) return { text: '', attachments: [] };
@@ -101,22 +134,12 @@ function _buildMessageElement(role, content, streaming, thinking, agentId, attac
   }
 
   // ── 头像 ──
-  const avatar = document.createElement('div');
-  avatar.className = 'avatar';
-  if (role === 'assistant' && resolvedAgentName) {
-    const av = (agent && agent.avatar) || '';
-    avatar.innerHTML = av ? renderAgentAvatar(av, resolvedAgentName) : '<img src="' + LOGO_SRC + '" alt="" class="avatar-logo-img">';
-    const ac = _getAgentColor(resolvedAgentName);
-    avatar.style.background = ac;
-    div.style.setProperty('--agent-color', ac);
+  const avResult = _buildAvatarEl(role, agent);
+  div.appendChild(avResult.el);
+  if (avResult.color) {
+    div.style.setProperty('--agent-color', avResult.color);
     div.classList.add('message-agent');
-  } else if (role === 'assistant') {
-    avatar.style.background = 'linear-gradient(135deg, var(--accent), var(--accent-hover))';
-    avatar.innerHTML = '<img src="' + LOGO_SRC + '" alt="" class="avatar-logo-img">';
-  } else {
-    avatar.textContent = '你';
   }
-  div.appendChild(avatar);
 
   // ── 气泡 ──
   const bubble = document.createElement('div');
@@ -186,8 +209,7 @@ function _buildMessageElement(role, content, streaming, thinking, agentId, attac
       const contentEl = document.createElement('div');
       contentEl.className = 'agent-content';
       if (role === 'assistant') {
-        contentEl.innerHTML = renderMarkdown(content);
-        contentEl.dataset.raw = content;
+        _renderContent(contentEl, content);
       } else {
         contentEl.textContent = content;
       }
@@ -197,10 +219,7 @@ function _buildMessageElement(role, content, streaming, thinking, agentId, attac
 
   // ── 操作按钮（仅 assistant，流式结束后可见） ──
   if (role === 'assistant' && !streaming) {
-    const actions = document.createElement('div');
-    actions.className = 'msg-actions';
-    actions.innerHTML = '<button class="msg-act-btn" data-action="copy" title="复制">📋</button>';
-    bubble.appendChild(actions);
+    _ensureActions(bubble);
   }
 
   div.appendChild(bubble);
@@ -331,15 +350,9 @@ const MessageRenderer = {
     if (!bubble) return;
     const contentEl = bubble.querySelector('.agent-content');
     if (contentEl) {
-      contentEl.innerHTML = renderMarkdown(newContent);
-      contentEl.dataset.raw = newContent;
+      _renderContent(contentEl, newContent);
     }
-    if (!bubble.querySelector('.msg-actions')) {
-      const actions = document.createElement('div');
-      actions.className = 'msg-actions';
-      actions.innerHTML = '<button class="msg-act-btn" data-action="copy" title="复制">📋</button>';
-      bubble.appendChild(actions);
-    }
+    _ensureActions(bubble);
   },
 
   appendToLastAssistantMessage: function (content, agentId) {
@@ -369,8 +382,7 @@ const MessageRenderer = {
 
     const contentEl = document.createElement('div');
     contentEl.className = 'agent-content';
-    contentEl.innerHTML = renderMarkdown(content);
-    contentEl.dataset.raw = content;
+    _renderContent(contentEl, content);
     block.appendChild(contentEl);
 
     const actions = bubble.querySelector('.msg-actions');
@@ -509,23 +521,15 @@ const MessageRenderer = {
     // 更新内容
     let contentEl = bubble.querySelector('.agent-content');
     if (contentEl) {
-      contentEl.innerHTML = renderMarkdown(content);
-      contentEl.dataset.raw = content;
+      _renderContent(contentEl, content);
     } else {
       contentEl = document.createElement('div');
       contentEl.className = 'agent-content';
-      contentEl.innerHTML = renderMarkdown(content);
-      contentEl.dataset.raw = content;
+      _renderContent(contentEl, content);
       bubble.appendChild(contentEl);
     }
 
-    // 确保有复制按钮
-    if (!bubble.querySelector('.msg-actions')) {
-      const actions = document.createElement('div');
-      actions.className = 'msg-actions';
-      actions.innerHTML = '<button class="msg-act-btn" data-action="copy" title="复制">📋</button>';
-      bubble.appendChild(actions);
-    }
+    _ensureActions(bubble);
 
     return true;
   },
