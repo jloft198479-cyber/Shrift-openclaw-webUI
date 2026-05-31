@@ -31,6 +31,9 @@
   --border:       #EAEAEA;
   --border-soft:  #E5E4E0;
   --border-light: #F0EFEF;
+  --border-subtle: rgba(0,0,0,0.08);
+  --hover-bg:     rgba(0,0,0,0.05);
+  --surface-hover: rgba(0,0,0,0.04);
   --scrollbar-hover: #C4C4C2;
 
   /* ── Pastel 语义色（仅用于标签/徽章/状态点缀） ─── */
@@ -751,7 +754,7 @@ body.resizing-agent-section * {
 }
 .message.assistant .bubble {
   background: var(--surface);
-  border: 1px solid rgba(0,0,0,0.08);
+  border: 1px solid var(--border-subtle);
   box-shadow: var(--shadow-sm);
   color: var(--text);
   padding: 14px 18px;
@@ -898,7 +901,7 @@ body.resizing-agent-section * {
 
 .bubble hr {
   border: none;
-  border-top: 1px solid rgba(0,0,0,0.08);
+  border-top: 1px solid var(--border-subtle);
   margin: 20px 0;
 }
 
@@ -1119,7 +1122,7 @@ body.resizing-agent-section * {
 
 /* ── 气泡内分隔线 ───────────────────────────────────────── */
 .bubble-separator {
-  border-top: 1px solid rgba(0,0,0,0.08);
+  border-top: 1px solid var(--border-subtle);
   margin: 28px 0 22px;
 }
 
@@ -1573,7 +1576,7 @@ body.resizing-agent-section * {
 .agent-delegate-btns {
   display: flex; flex-wrap: wrap; gap: 6px;
   margin-top: 16px; padding-top: 14px;
-  border-top: 1px solid rgba(0,0,0,0.08);
+  border-top: 1px solid var(--border-subtle);
 }
 .agent-delegate-btn {
   font-size: var(--font-sm); padding: 5px 12px;
@@ -2234,7 +2237,7 @@ body.resizing-agent-section * {
   gap: 4px;
   margin-top: 24px;
   padding-top: 16px;
-  border-top: 1px solid rgba(0,0,0,0.08);
+  border-top: 1px solid var(--border-subtle);
   transition: opacity 150ms ease;
 }
 
