@@ -91,10 +91,19 @@ const MessageBuilder = {
           image_url: { url: window.location.origin + att.path },
         });
       } else if (att.path) {
-        parts.push({
-          type: 'text',
-          text: '[附件: ' + att.name + ' (路径: ' + att.path + ', 类型: ' + att.type + ')]',
-        });
+        if (att.content) {
+          const langMatch = att.name ? att.name.match(/\.(\w+)$/) : null;
+          const lang = langMatch ? langMatch[1] : '';
+          parts.push({
+            type: 'text',
+            text: '[文件: ' + att.name + ']\n```' + lang + '\n' + att.content + '\n```',
+          });
+        } else {
+          parts.push({
+            type: 'text',
+            text: '[文件: ' + att.name + ']',
+          });
+        }
       }
     }
 

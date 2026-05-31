@@ -19,13 +19,23 @@ const agentRoutes = require('./agent-routes');
 const sessionSync = require('./session-sync');
 const debugTrace = require('./debug-trace');
 
-const UPLOAD_ALLOWED_EXT = {
+const TEXT_EXTS = {
+  '.txt': 1, '.md': 1, '.json': 1, '.csv': 1,
+  '.js': 1, '.ts': 1, '.py': 1, '.html': 1, '.css': 1, '.xml': 1,
+  '.yml': 1, '.yaml': 1, '.toml': 1, '.ini': 1, '.cfg': 1, '.conf': 1,
+  '.sh': 1, '.bat': 1, '.ps1': 1, '.env': 1,
+  '.java': 1, '.c': 1, '.cpp': 1, '.h': 1, '.hpp': 1, '.rs': 1, '.go': 1,
+  '.rb': 1, '.php': 1, '.sql': 1, '.r': 1, '.lua': 1, '.pl': 1,
+  '.swift': 1, '.kt': 1, '.scala': 1, '.dart': 1, '.vue': 1, '.svelte': 1,
+  '.jsx': 1, '.tsx': 1, '.mjs': 1, '.cjs': 1, '.mts': 1,
+};
+
+const UPLOAD_ALLOWED_EXT = Object.assign({
   '.png': 1, '.jpg': 1, '.jpeg': 1, '.gif': 1, '.svg': 1, '.webp': 1,
   '.pdf': 1, '.txt': 1, '.md': 1, '.json': 1, '.csv': 1,
-  '.js': 1, '.ts': 1, '.py': 1, '.html': 1, '.css': 1, '.xml': 1,
   '.zip': 1, '.tar': 1, '.gz': 1,
   '.doc': 1, '.docx': 1, '.xls': 1, '.xlsx': 1, '.ppt': 1, '.pptx': 1,
-};
+}, TEXT_EXTS);
 
 function _safeSessionId(id) {
   if (!id || typeof id !== 'string') return null;
@@ -69,6 +79,7 @@ module.exports = {
     const collectBody = deps.collectBody;
     const getConfig = deps.getConfig;
     const refreshSetupMode = deps.refreshSetupMode;
+    const stateDir = deps.stateDir;
 
     function handleUpload(req, res) {
       collectBody(req, function (b, _raw, err) {
@@ -93,11 +104,18 @@ module.exports = {
           const base64 = b.data.slice(commaIdx + 1);
           const buf = Buffer.from(base64, 'base64');
           const fileName = Date.now() + '-' + Math.random().toString(36).slice(2, 8) + ext;
-          const uploadDir = path.join(__dirname, 'uploads');
+          const uploadDir = stateDir ? path.join(stateDir, 'uploads') : path.join(__dirname, 'uploads');
           if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
           fs.writeFileSync(path.join(uploadDir, fileName), buf);
+          const result = { name: b.name, path: '/uploads/' + fileName, type: b.type || 'application/octet-stream' };
+          if (TEXT_EXTS[ext]) {
+            try {
+              const fileContent = fs.readFileSync(path.join(uploadDir, fileName), 'utf8').slice(0, 102400);
+              result.content = fileContent;
+            } catch (e) {}
+          }
           res.writeHead(200, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ name: b.name, path: '/uploads/' + fileName, type: b.type || 'application/octet-stream' }));
+          res.end(JSON.stringify(result));
         } catch (e) {
           res.writeHead(500, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: e.message }));

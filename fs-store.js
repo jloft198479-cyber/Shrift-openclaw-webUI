@@ -45,7 +45,8 @@ function resolveHome(p) {
 function readConfig() {
   if (!OPENCLAW_CONFIG || !fs.existsSync(OPENCLAW_CONFIG)) return null;
   try {
-    return JSON.parse(fs.readFileSync(OPENCLAW_CONFIG, 'utf8'));
+    const raw = fs.readFileSync(OPENCLAW_CONFIG, 'utf8');
+    return JSON.parse(raw.replace(/^\uFEFF/, ''));
   } catch (e) {
     console.error('[FS] Cannot read openclaw.json:', e.message);
     return null;

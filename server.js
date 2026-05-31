@@ -270,7 +270,10 @@ function serveStatic(req, res) {
   let fullPath;
   if (filePath.indexOf('/uploads/') === 0) {
     fullPath = path.join(__dirname, filePath);
-    if (fullPath.indexOf(path.join(__dirname, 'uploads')) !== 0) { res.writeHead(403); res.end('Forbidden'); return; }
+    if (fullPath.indexOf(path.join(__dirname, 'uploads')) !== 0) {
+      if (!store.getDataDir()) { res.writeHead(403); res.end('Forbidden'); return; }
+      fullPath = path.join(store.getDataDir(), 'uploads', path.basename(filePath));
+    }
   } else {
     fullPath = path.join(WEB_DIR, filePath);
     if (fullPath.indexOf(WEB_DIR) !== 0) { res.writeHead(403); res.end('Forbidden'); return; }
@@ -319,6 +322,7 @@ const routeHandlers = routes.init({
   collectBody: collectBody,
   getConfig: function () { return config; },
   refreshSetupMode: _refreshSetupMode,
+  stateDir: store.getDataDir(),
 });
 const ROUTES = routeHandlers.routes;
 

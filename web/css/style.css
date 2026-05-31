@@ -715,7 +715,7 @@ body.resizing-agent-section * {
 .message {
   display: flex;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
   animation: fadeIn 200ms ease-out;
 }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
@@ -754,7 +754,7 @@ body.resizing-agent-section * {
 }
 .message.assistant .bubble {
   background: var(--surface);
-  border: 1px solid var(--border);
+  border: 1px solid rgba(0,0,0,0.08);
   box-shadow: var(--shadow-sm);
   color: var(--text);
   padding: 14px 18px;
@@ -897,6 +897,12 @@ body.resizing-agent-section * {
   border-left: 3px solid var(--accent);
   color: var(--text-2);
   overflow-wrap: break-word;
+}
+
+.bubble hr {
+  border: none;
+  border-top: 1px solid rgba(0,0,0,0.08);
+  margin: 20px 0;
 }
 
 .agent-block-tag {
@@ -1116,8 +1122,8 @@ body.resizing-agent-section * {
 
 /* ── 气泡内分隔线 ───────────────────────────────────────── */
 .bubble-separator {
-  border-top: 1px solid rgba(0,0,0,0.06);
-  margin: 18px 0 14px;
+  border-top: 1px solid rgba(0,0,0,0.08);
+  margin: 28px 0 22px;
 }
 
 /* ── 气泡内子 Agent 内容块 ──────────────────────────────── */
@@ -1569,8 +1575,8 @@ body.resizing-agent-section * {
 /* ── 委托按钮（回复中检测到 agent 名字时） ────────────── */
 .agent-delegate-btns {
   display: flex; flex-wrap: wrap; gap: 6px;
-  margin-top: 12px; padding-top: 10px;
-  border-top: 1px solid var(--border-light);
+  margin-top: 16px; padding-top: 14px;
+  border-top: 1px solid rgba(0,0,0,0.08);
 }
 .agent-delegate-btn {
   font-size: var(--font-sm); padding: 5px 12px;
@@ -2230,15 +2236,19 @@ body.resizing-agent-section * {
   display: flex;
   justify-content: flex-end;
   gap: 4px;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border-light);
-  opacity: 0;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(0,0,0,0.08);
   transition: opacity 150ms ease;
-  pointer-events: none;
 }
-.message.assistant:hover .msg-actions,
-.msg-actions:focus-within {
+
+.msg-actions .msg-act-btn {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+}
+.message.assistant:hover .msg-actions .msg-act-btn,
+.msg-actions:focus-within .msg-act-btn {
   opacity: 1;
   pointer-events: auto;
 }
@@ -2385,8 +2395,9 @@ body.resizing-agent-section * {
   }
 
   /* 操作按钮 */
-  .msg-actions {
-    opacity: 1; /* 移动端始终显示 */
+  .msg-actions .msg-act-btn {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 

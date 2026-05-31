@@ -187,6 +187,7 @@ function _buildMessageElement(role, content, streaming, thinking, agentId, attac
       contentEl.className = 'agent-content';
       if (role === 'assistant') {
         contentEl.innerHTML = renderMarkdown(content);
+        contentEl.dataset.raw = content;
       } else {
         contentEl.textContent = content;
       }
@@ -224,11 +225,11 @@ const MessageRenderer = {
     });
   },
 
-  /** 复制消息纯文本内容 */
+  /** 复制消息内容（优先原始 Markdown） */
   _copyMessage: function (btn, messageEl) {
     const content = messageEl.querySelector('.agent-content');
     if (!content) return;
-    const text = content.innerText || content.textContent || '';
+    const text = content.dataset.raw || content.innerText || content.textContent || '';
     if (!text) return;
     Utils.copyToClipboard(text, function () {
       MessageRenderer._flashCopied(btn);
@@ -331,6 +332,7 @@ const MessageRenderer = {
     const contentEl = bubble.querySelector('.agent-content');
     if (contentEl) {
       contentEl.innerHTML = renderMarkdown(newContent);
+      contentEl.dataset.raw = newContent;
     }
     if (!bubble.querySelector('.msg-actions')) {
       const actions = document.createElement('div');
@@ -368,6 +370,7 @@ const MessageRenderer = {
     const contentEl = document.createElement('div');
     contentEl.className = 'agent-content';
     contentEl.innerHTML = renderMarkdown(content);
+    contentEl.dataset.raw = content;
     block.appendChild(contentEl);
 
     const actions = bubble.querySelector('.msg-actions');
@@ -507,10 +510,12 @@ const MessageRenderer = {
     let contentEl = bubble.querySelector('.agent-content');
     if (contentEl) {
       contentEl.innerHTML = renderMarkdown(content);
+      contentEl.dataset.raw = content;
     } else {
       contentEl = document.createElement('div');
       contentEl.className = 'agent-content';
       contentEl.innerHTML = renderMarkdown(content);
+      contentEl.dataset.raw = content;
       bubble.appendChild(contentEl);
     }
 

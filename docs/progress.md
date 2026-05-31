@@ -407,9 +407,72 @@ cd F:\fzz-Project\openclaw-web-ui\; node server.js
 
 **结论**：OpenClaw 的原生 `sessions_spawn` 发现机制不依赖 AGENTS.md 中的子 Agent 列表，写入是冗余的。
 
+### 关键经验记录 — 图片上传自动压缩（2026-05-31）
+
+**优化内容**：上传图片前用 Canvas 自动缩放，最长边 ≤ 1024px，JPEG quality 0.85。
+**降级保护**：
+- SVG/GIF 跳过压缩（保留动图/矢量）
+- 压缩后更大 → 用原图
+- Canvas 不可用 → 静默跳过
+**涉及文件**：`attachment-bar.js`（+41行）、`chat-view.js`（-1行）、`constants.js`（-6行）
+**commit**：`03b24bb`
+
+### 关键经验记录 — MiMo 多模态接入与文件附件内联（2026-05-31）
+
+**背景**：接入小米 MiMo 模型后，图片上传后前端传了 base64 但模型看不到；文本文件让 Agent exec 读取不可靠且浪费 token。
+
+**修复链（三次迭代）**：
+
+**第一轮（BOM + Gateway 配置）**：
+- `openclaw.json` xiaomi 配置缺 `"api": "openai-completions"` 和 `"input": ["text","image"]` → 补充
+- `fs-store.js` 的 `readConfig()` 不兼容 UTF-8 BOM → 加 `raw.replace(/^\uFEFF/, '')`
+- PowerShell `Set-Content -Encoding UTF8` 默认加 BOM → 后续只手动改文件，不用命令覆写
+
+**第二轮（上传路径迁移）**：
+- 上传目录硬编码在项目 `uploads/` → 迁移到 `stateDir/uploads/`（`D:\AppData\openclaw\uploads\`），自动自适应
+- 路径不可移植 → 用 `store.getDataDir()` 获取，零硬编码
+
+**第三轮（按 Open WebUI 最佳实践重构文件附件）**：
+- 放弃 exec 工具路径模式 → 后端上传时自动读取文本文件内容（TEXT_EXTS 涵盖 44 种代码/文档扩展名）
+- 内容以内联代码块嵌入 user message → 零工具开销，零路径依赖
+- 图片仍走 base64 image_url，二进制文件保留 `[文件: xxx]` 占位
+- 内容上限 100KB，避免请求体膨胀
+- `UPLOAD_ALLOWED_EXT` 通过 `Object.assign` 合并 `TEXT_EXTS`，共 64 种可上传
+
+**涉及文件**：`routes.js`、`server.js`、`fs-store.js`、`message-builder.js`、`session-interaction.js`、`openclaw.json`
+
+### 关键经验记录 — 复制按钮支持原始 Markdown（2026-05-31）
+
+**问题**：点击 📋 复制的是 `innerText`（纯文本），粘贴后丢失所有格式。
+
+**修复**：
+- 渲染时在 `.agent-content` 上附加 `dataset.raw = content`（原始 Markdown）
+- `_copyMessage` 优先读取 `dataset.raw`，回退 `innerText`
+- 覆盖 4 处渲染函数：`_buildMessageElement`、`updateBubbleContent`、`appendToLastAssistantMessage`、`updateLastAssistantMessage`
+
+### 关键经验记录 — 分隔线 CSS 重构（2026-05-31）
+
+**问题**：气泡分割线颜色位置反复调整未锚准，5 处硬编码 rgba 散落各处。
+
+**修复**：
+- 统一气泡外边框、`<hr>`、`.bubble-separator`、`.agent-delegate-btns`、`.msg-actions` 5 处线条为 `rgba(0,0,0,0.08)`
+- 消息间距从 16px → 24px，增加呼吸感
+- `.msg-actions` 的 `opacity` 改为只控制按钮，边框始终可见
+
+### 后续待处理 — 代码质量债务
+
+1. **CSS 硬编码值繁多** — `--border-subtle` 变量未定义，5 处 `rgba(0,0,0,0.08)` 重复，改一次要找 5 处
+2. **JS 重复逻辑** — `msg-actions` 创建重复 3 次、`dataset.raw` 赋值重复 5 次、`renderMarkdown` 调用重复 5 次
+3. **无 `_ensureActions()` 工具函数** — 同一段 DOM 创建代码拷贝了 3 份
+4. **无 `_renderContent()` 包装** — `innerHTML = renderMarkdown + dataset.raw` 模式重复 5 次
+5. 以上问题见 `docs/code-quality-debt.md`，待下阶段集中处理
+
 ### 后续待验证
 
 1. @子Agent 直连路径 — `onAgentSwitch` 回调正常
 2. 智能调度路径 — announce 结构化存储 + 回放渲染
 3. dispatch 长任务 — 安全定时器不再提前关闭
 4. 新 session 回看 — announces 渲染为 `bubble-content-block`
+5. MiMo 图片识别（已通过）
+6. 文本文件内联内容（已实现，待验证）
+7. 复制按钮输出原始 MD（已实现，待验证）
