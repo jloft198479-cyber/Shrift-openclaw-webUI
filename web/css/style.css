@@ -884,6 +884,12 @@ body.resizing-agent-section * {
   line-height: var(--leading-tight);
   word-break: break-word;
 }
+.bubble h1 { font-size: 1.2em; }
+.bubble h2 { font-size: 1.1em; }
+.bubble h3 { font-size: 1.05em; }
+.bubble h4 { font-size: 1em; }
+.bubble h5 { font-size: 0.95em; }
+.bubble h6 { font-size: 0.9em; }
 
 .bubble blockquote {
   margin: 4px 0;

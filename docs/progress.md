@@ -95,11 +95,12 @@ OpenClaw Web UI 助理
 
 ### 已配置的 Agent
 
-| Agent ID | 名称 | 工作区 | 身份 | 可 spawn 子 Agent |
+| Agent ID | 名称 | 工作区 | 头像 | 可 spawn 子 Agent |
 |----------|------|--------|------|-------------------|
-| main | OpenClaw 主助理 | ~/.openclaw/workspace | 🤖 OpenClaw | jobs, mrbeast |
-| jobs | 乔布斯 | ~/.openclaw/workspace-jobs | 🍎 Steve | — |
-| mrbeast | MrBeast | ~/.openclaw/workspace-mrbeast | 💰 MrBeast | — |
+| main | 虾指挥 | ~/.openclaw/workspace | /logo.svg | jobs, mrbeast, ppt 等 |
+| jobs | 乔布斯 | ~/.openclaw/workspace-jobs | avatars/male-james.svg | — |
+| mrbeast | MrBeast | ~/.openclaw/workspace-mrbeast | avatars/male-michael.svg | — |
+| ppt | 小王 | ~/.openclaw/workspace-ppt | avatars/male-james.svg | — |
 
 ### 环境变量（已设置，用户级永久）
 
@@ -332,3 +333,65 @@ F:\fzz-Project\claude-ui\hermes\
 8. **Gateway 必须从普通终端启动**——TRAE 沙盒会阻止文件写入导致 HTTP API 500
 9. **子 Agent 人设必须写在 AGENTS.md**——SOUL.md 不会被注入子 Agent 上下文
 10. **sessions_spawn 是非阻塞的**——前端需要 WebSocket 接收异步结果
+
+---
+
+## 十、最新会话工作记录（2026-05-31）
+
+### 1. 头像系统清理（emoji→SVG）
+
+| 问题 | 改动 | 文件 |
+|------|------|------|
+| `'🤖'` 硬编码 4 处 | 替换为 SVG 池分配或名字首字 | `utils.js`, `agent-list.js`, `welcome-view.js` |
+| `normalizeAgents` 的 `id === 'main'` 特殊处理 | 去除，所有 agent 一视同仁 | `utils.js` |
+| `renderAgentAvatar` 默认 emoji 回退 | 空头像 → 名字首字 | `utils.js` |
+| `_getAgentLabel` 中多余的 emoji 检测分支 | 简化，直接返回首字 | `session-list.js` |
+| 团队成员列表显示 emoji（如 `🍎 乔布斯`） | `_extractTeamFromMd` 解析时自动去掉前置 emoji | `agent-routes.js` |
+| 主 Agent 头像 | 通过 `PUT /api/agents/main` 存为 `/logo.svg`，无需硬编码 | API 存储 |
+
+### 2. 核心架构排查与修复（@直连 + 智能调度）
+
+| 级别 | 问题 | 修复 | commit |
+|------|------|------|--------|
+| P0 | `const actualAgentId` agent 切换时 TypeError | `const`→`let`，允许回调中重新赋值 | `978d961` |
+| P0 | session 回放丢失 dispatch 子 Agent 标签 | `announces[{agentId, content}]` 结构化存储，回放渲染为 DOM 块 | `c1c4013` |
+| P1 | dispatch 超时 15s 过早关闭 + 120s 不足 | 30s 检查完成 / 300s 强制超时；新增 `_resetDispatchSafetyTimer` 活动保活 | `3f6b09f` |
+| P2 | `chat-update` 空事件监听消耗带宽 | 删除无函数体的空监听 | `cf2ddd0` |
+| P3 | `session-sync` 子 Agent 高频 `session.tool` 事件风暴 | 过滤含 `:subagent:` 的 tool/agent 事件 | `ac7887b` |
+| P3 | `virtual-list.js` 降级渲染统一标 `'AI'` | 改为使用 `message.agentId` 首字符 | `6d4cadb` |
+
+### 3. UI 修复
+
+| 问题 | 修复 |
+|------|------|
+| 气泡内标题字号过大（h1=30px） | 气泡内 h1-h6 加上比例字号（h1=1.2em~h6=0.9em） |
+
+### 可回滚基线
+
+```bash
+git reset --hard 2c053fd
+```
+
+### 当前服务状态
+
+| 服务 | 端口 | 状态 |
+|------|------|------|
+| Web UI 服务器 | localhost:3001 | ✅ 运行中 |
+| OpenClaw Gateway | 127.0.0.1:18789 | ✅ 运行中 |
+
+### 启动方式
+
+```powershell
+# Gateway（必须在普通终端，TRAE 外）
+openclaw gateway
+
+# Web UI（TRAE 内）
+cd F:\fzz-Project\openclaw-web-ui\; node server.js
+```
+
+### 后续待验证
+
+1. @子Agent 直连路径 — `onAgentSwitch` 回调正常
+2. 智能调度路径 — announce 结构化存储 + 回放渲染
+3. dispatch 长任务 — 安全定时器不再提前关闭
+4. 新 session 回看 — announces 渲染为 `bubble-content-block`
