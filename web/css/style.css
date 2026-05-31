@@ -5,32 +5,29 @@
   /* ── 色彩（Warm Monochrome + Muted Pastels） ─── */
   --bg:           #F7F6F3;
   --bg-secondary: #F0EFEB;
-  --bg-inverse:   #111111;
+  --bg-inverse:   #111;
   --sidebar-bg:   #FBFBFA;
-  --surface:      #FFFFFF;
+  --surface:      #FFF;
   --surface-warm: #F9F9F8;
   --surface-input:#F9F9F8;
-  --text:         #111111;
+  --text:         #111;
   --text-2:       #2F3437;
   --muted:        #787774;
   --meta:         #A8A8A6;
-
-  --accent:       #111111;
-  --accent-on:    #FFFFFF;
+  --accent:       #111;
+  --accent-on:    #FFF;
   --accent-light: #F0EFEF;
-  --accent-hover: #333333;
+  --accent-hover: #333;
   --danger:       #9F2F2D;
   --danger-light: #FDEBEC;
   --warning:      #956400;
   --success:      #346538;
   --success-light:#EDF3EC;
-
   --user-avatar-bg:    #EAEAEA;
-  --user-avatar-text:   #111111;
+  --user-avatar-text:   #111;
   --new-chat-hover:     #F0EFEF;
-  --stop-btn-bg:        #111111;
-  --stop-btn-hover:     #333333;
-
+  --stop-btn-bg:        #111;
+  --stop-btn-hover:     #333;
   --border:       #EAEAEA;
   --border-soft:  #E5E4E0;
   --border-light: #F0EFEF;
@@ -72,8 +69,8 @@
   --space-10: 40px;
 
   /* ── 字体（本地加载: Inter 全家族） ─── */
-  --font:         "Inter", "Microsoft YaHei UI", "Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
-  --font-display: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font:         "Inter", "Microsoft YaHei UI", "Noto Sans SC", -apple-system, blinkmacsystemfont, "Segoe UI", "Helvetica Neue", arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-display: "Inter", -apple-system, blinkmacsystemfont, "Segoe UI", "Helvetica Neue", arial, sans-serif;
   --font-mono:    "JetBrains Mono", "SF Mono", "Cascadia Code", "Consolas", monospace;
 
   /* ── 字号 scale ─── */
@@ -118,28 +115,28 @@
 
 /* ── Local Fonts (@font-face) ─────────────────────────── */
 @font-face {
-  font-family: 'Inter';
+  font-family: Inter;
   font-style: normal;
   font-weight: 400;
   font-display: swap;
   src: url('../fonts/Inter-Regular.ttf') format('truetype');
 }
 @font-face {
-  font-family: 'Inter';
+  font-family: Inter;
   font-style: normal;
   font-weight: 500;
   font-display: swap;
   src: url('../fonts/Inter-Medium.ttf') format('truetype');
 }
 @font-face {
-  font-family: 'Inter';
+  font-family: Inter;
   font-style: normal;
   font-weight: 600;
   font-display: swap;
   src: url('../fonts/Inter-SemiBold.ttf') format('truetype');
 }
 @font-face {
-  font-family: 'Inter';
+  font-family: Inter;
   font-style: normal;
   font-weight: 700;
   font-display: swap;
@@ -167,7 +164,7 @@
   src: url('../fonts/JetBrainsMono-Regular.ttf') format('truetype');
 }
 @font-face {
-  font-family: 'HYQiHei';
+  font-family: HYQiHei;
   font-style: normal;
   font-weight: 650;
   font-display: swap;
@@ -332,7 +329,7 @@ body.resizing-agent-section * {
 .sidebar-header .logo img { display: block; max-height: 28px; width: auto; }
 
 .sidebar-header h1 {
-  font-family: 'HYQiHei', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  font-family: HYQiHei, 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
   font-size: 18px;
   font-weight: 650;
   color: var(--text);
@@ -651,7 +648,7 @@ body.resizing-agent-section * {
   margin-bottom: 20px;
 }
 #welcome .welcome-logo img { display: block; }
-#welcome h2 { font-family: 'HYQiHei', 'Noto Sans SC', 'Microsoft YaHei', sans-serif; font-size: 24px; font-weight: 650; margin-bottom: 12px; letter-spacing: -0.01em; line-height: var(--leading-tight); color: var(--text); }
+#welcome h2 { font-family: HYQiHei, 'Noto Sans SC', 'Microsoft YaHei', sans-serif; font-size: 24px; font-weight: 650; margin-bottom: 12px; letter-spacing: -0.01em; line-height: var(--leading-tight); color: var(--text); }
 #welcome h2::after {
   content: "";
   display: block;
@@ -1259,7 +1256,7 @@ body.resizing-agent-section * {
 .model-pill.disabled::after { content: none; }
 .model-select {
   appearance: none;
-  -webkit-appearance: none;
+  appearance: none;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1279,7 +1276,7 @@ body.resizing-agent-section * {
 .agent-model-select {
   width: 100%;
   appearance: none;
-  -webkit-appearance: none;
+  appearance: none;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1827,7 +1824,7 @@ body.resizing-agent-section * {
   display: none;
 }
 #agent-section .section-title {
-  font-family: 'HYQiHei', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
+  font-family: HYQiHei, 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
   font-size: 13px;
   font-weight: 650;
   color: var(--meta);
@@ -1864,8 +1861,7 @@ body.resizing-agent-section * {
   flex-direction: column;
   gap: 6px;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden auto;
 }
 #agent-section:not(.has-custom-height) > #agent-list {
   max-height: min(180px, calc(100vh - 320px));
