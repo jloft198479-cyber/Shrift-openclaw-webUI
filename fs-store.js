@@ -38,8 +38,15 @@ function _canWriteDir(dir) {
 function resolveHome(p) {
   if (!p) return p;
   if (p.indexOf('~') !== 0) return p;
+  const suffix = p.slice(1).replace(/^[\\\/]/, '');
+  // 当设置了 OPENCLAW_STATE_DIR 且路径以 .openclaw/ 开头时，
+  // 去掉 .openclaw/ 前缀，基于 STATE_DIR 解析
+  if (process.env.OPENCLAW_STATE_DIR && (suffix.indexOf('.openclaw') === 0)) {
+    const rest = suffix.slice('.openclaw'.length).replace(/^[\\\/]/, '');
+    return path.join(process.env.OPENCLAW_STATE_DIR, rest);
+  }
   const home = process.env.USERPROFILE || process.env.HOME || '';
-  return path.join(home, p.slice(1).replace(/^[\\\/]/, ''));
+  return path.join(home, suffix);
 }
 
 function readConfig() {
@@ -148,25 +155,33 @@ function scanSkills(ws) {
   return skills;
 }
 
-function scanGlobalSkills() {
-  const skills = [];
-  const home = process.env.USERPROFILE || process.env.HOME || '';
-  if (!home) return skills;
-  const globalDir = path.join(home, '.openclaw', 'skills');
+function _scanDirSkills(dir, source, skills) {
   try {
-    if (!fs.existsSync(globalDir) || !fs.statSync(globalDir).isDirectory()) return skills;
-    fs.readdirSync(globalDir).forEach(function (d) {
-      const skillPath = path.join(globalDir, d);
+    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) return;
+    fs.readdirSync(dir).forEach(function (d) {
+      const skillPath = path.join(dir, d);
       try {
         if (!fs.statSync(skillPath).isDirectory()) return;
         const skillMd = path.join(skillPath, 'SKILL.md');
         const info = _parseSkillMd(d, skillMd);
-        info.source = 'global';
+        info.source = source;
         info.path = skillPath;
         skills.push(info);
       } catch (se) {}
     });
   } catch (e) {}
+}
+
+function scanGlobalSkills() {
+  const skills = [];
+  const stateDir = process.env.OPENCLAW_STATE_DIR;
+  if (stateDir) {
+    _scanDirSkills(path.join(stateDir, 'skills'), 'global', skills);
+  }
+  const home = process.env.USERPROFILE || process.env.HOME || '';
+  if (home) {
+    _scanDirSkills(path.join(home, '.openclaw', 'skills'), 'global', skills);
+  }
   return skills;
 }
 
@@ -246,6 +261,8 @@ function _isPathWithinAllowedRoots(targetPath) {
   const target = path.resolve(targetPath);
   const allowedRoots = [];
   if (DATA_DIR) allowedRoots.push(path.resolve(DATA_DIR));
+  const stateDir = process.env.OPENCLAW_STATE_DIR;
+  if (stateDir) allowedRoots.push(path.resolve(stateDir));
   const home = process.env.USERPROFILE || process.env.HOME || '';
   if (home) allowedRoots.push(path.join(home, '.openclaw'));
   if (allowedRoots.length === 0) return false;

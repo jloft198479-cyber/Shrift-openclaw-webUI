@@ -112,6 +112,17 @@ const InteractionBindings = {
       }
     });
 
+    const folderBtn = document.getElementById('open-folder-btn');
+    self._addListener(folderBtn, 'click', async function () {
+      try {
+        const res = await fetch('/api/open-folder', { method: 'POST' });
+        const data = await res.json();
+        if (!data.success) showToast('打开失败: ' + (data.error || '未知错误'), 3000, 'error');
+      } catch (err) {
+        showToast('请求失败: ' + err.message, 3000, 'error');
+      }
+    });
+
     const attachBtn = document.getElementById('attach-btn');
     self._addListener(attachBtn, 'click', function () {
       const fileInput = document.createElement('input');

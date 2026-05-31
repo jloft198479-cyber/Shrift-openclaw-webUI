@@ -110,6 +110,88 @@ function _buildAttachmentCards(attachments) {
   return '<div class="msg-attachments">' + cards + '</div>';
 }
 
+function _resolveMessageAgent(role, agentId) {
+  const resolvedAgentId = (agentId !== undefined && agentId !== '') ? agentId : ((role === 'assistant' && State.currentAgent) || '');
+  const agent = State.findAgent(resolvedAgentId);
+  const resolvedAgentName = (agent && agent.displayName) || (role === 'assistant' ? APP_NAME : resolvedAgentId);
+  if (role === 'assistant') {
+    DebugTrace.log('buildMessageElement', { role: role, inputAgentId: agentId, resolvedAgentId: resolvedAgentId, resolvedAgentName: resolvedAgentName, currentAgent: State.currentAgent, interactionMode: State.interactionMode });
+  }
+  return { resolvedAgentId: resolvedAgentId, agent: agent, resolvedAgentName: resolvedAgentName };
+}
+
+function _buildAgentLabel(bubble, agent, resolvedAgentName) {
+  const label = document.createElement('div');
+  label.className = 'agent-label';
+  label.innerHTML = _buildAgentLabelHtml(agent, resolvedAgentName);
+  bubble.appendChild(label);
+}
+
+function _buildUserContent(bubble, content, attachmentMeta) {
+  if (!content) return;
+  const parsed = _parseAttachments(content);
+
+  if (attachmentMeta && attachmentMeta.length > 0) {
+    if (parsed.text.trim()) {
+      const contentEl = document.createElement('div');
+      contentEl.className = 'agent-content';
+      contentEl.innerHTML = highlightMentions(parsed.text);
+      bubble.appendChild(contentEl);
+    }
+    const attContainer = document.createElement('div');
+    attContainer.className = 'msg-attachments';
+    for (let i = 0; i < attachmentMeta.length; i++) {
+      const att = attachmentMeta[i];
+      const icon = getAttachmentIcon(att.type);
+      const shortName = att.name.length > 20 ? att.name.slice(0, 18) + '…' : att.name;
+      const card = document.createElement('div');
+      card.className = 'msg-attachment-card';
+      card.innerHTML = '<span class="msg-att-icon">' + icon + '</span>'
+        + '<span class="msg-att-name" title="' + escapeHtml(att.name) + '">' + escapeHtml(shortName) + '</span>';
+      attContainer.appendChild(card);
+    }
+    bubble.appendChild(attContainer);
+  } else if (parsed.attachments.length > 0) {
+    if (parsed.text.trim()) {
+      const contentEl = document.createElement('div');
+      contentEl.className = 'agent-content';
+      contentEl.innerHTML = highlightMentions(parsed.text);
+      bubble.appendChild(contentEl);
+    }
+    bubble.insertAdjacentHTML('beforeend', _buildAttachmentCards(parsed.attachments));
+  } else {
+    const contentEl = document.createElement('div');
+    contentEl.className = 'agent-content';
+    contentEl.innerHTML = highlightMentions(content);
+    bubble.appendChild(contentEl);
+  }
+}
+
+function _buildAssistantContent(bubble, content, thinking, streaming) {
+  if (streaming) {
+    bubble.classList.add('streaming-cursor');
+    const contentEl = document.createElement('div');
+    contentEl.className = 'agent-content';
+    bubble.appendChild(contentEl);
+    return;
+  }
+
+  if (thinking) {
+    const tb = document.createElement('div');
+    tb.className = 'thinking-block';
+    tb.innerHTML = '<div class="thinking-toggle" onclick="this.nextElementSibling.classList.toggle(\'open\')">💭 已深度思考</div>'
+      + '<div class="thinking-content">' + escapeHtml(thinking) + '</div>';
+    bubble.appendChild(tb);
+  }
+
+  if (content) {
+    const contentEl = document.createElement('div');
+    contentEl.className = 'agent-content';
+    _renderContent(contentEl, content);
+    bubble.appendChild(contentEl);
+  }
+}
+
 /**
  * 构建消息 DOM 元素（私有方法，消除重复代码）
  * @param {string} role - 'user' | 'assistant'
@@ -124,16 +206,9 @@ function _buildMessageElement(role, content, streaming, thinking, agentId, attac
   const div = document.createElement('div');
   div.className = 'message ' + role;
 
-  const resolvedAgentId = (agentId !== undefined && agentId !== '') ? agentId : ((role === 'assistant' && State.currentAgent) || '');
-  const agent = State.findAgent(resolvedAgentId);
-  const resolvedAgentName = (agent && agent.displayName) || (role === 'assistant' ? APP_NAME : resolvedAgentId);
+  const { resolvedAgentId, agent, resolvedAgentName } = _resolveMessageAgent(role, agentId);
   if (resolvedAgentId) div.dataset.agentId = resolvedAgentId;
 
-  if (role === 'assistant') {
-    DebugTrace.log('buildMessageElement', { role: role, inputAgentId: agentId, resolvedAgentId: resolvedAgentId, resolvedAgentName: resolvedAgentName, currentAgent: State.currentAgent, interactionMode: State.interactionMode });
-  }
-
-  // ── 头像 ──
   const avResult = _buildAvatarEl(role, agent);
   div.appendChild(avResult.el);
   if (avResult.color) {
@@ -141,83 +216,19 @@ function _buildMessageElement(role, content, streaming, thinking, agentId, attac
     div.classList.add('message-agent');
   }
 
-  // ── 气泡 ──
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
 
-  // agent 标签
   if (role === 'assistant' && resolvedAgentName) {
-    const label = document.createElement('div');
-    label.className = 'agent-label';
-    label.innerHTML = _buildAgentLabelHtml(agent, resolvedAgentName);
-    bubble.appendChild(label);
+    _buildAgentLabel(bubble, agent, resolvedAgentName);
   }
 
-  // 内容
-  if (streaming) {
-    bubble.classList.add('streaming-cursor');
-    const contentEl = document.createElement('div');
-    contentEl.className = 'agent-content';
-    bubble.appendChild(contentEl);
-  } else {
-    if (thinking) {
-      const tb = document.createElement('div');
-      tb.className = 'thinking-block';
-      tb.innerHTML = '<div class="thinking-toggle" onclick="this.nextElementSibling.classList.toggle(\'open\')">💭 已深度思考</div>'
-        + '<div class="thinking-content">' + escapeHtml(thinking) + '</div>';
-      bubble.appendChild(tb);
-    }
-
-    // 用户消息：解析附件并渲染卡片
-    if (role === 'user' && content) {
-      const parsed = _parseAttachments(content);
-      if (attachmentMeta && attachmentMeta.length > 0) {
-        if (parsed.text.trim()) {
-          const contentEl = document.createElement('div');
-          contentEl.className = 'agent-content';
-          contentEl.innerHTML = highlightMentions(parsed.text);
-          bubble.appendChild(contentEl);
-        }
-        const attContainer = document.createElement('div');
-        attContainer.className = 'msg-attachments';
-        for (let i = 0; i < attachmentMeta.length; i++) {
-          const att = attachmentMeta[i];
-          const icon = getAttachmentIcon(att.type);
-          const shortName = att.name.length > 20 ? att.name.slice(0, 18) + '…' : att.name;
-          const card = document.createElement('div');
-          card.className = 'msg-attachment-card';
-          card.innerHTML = '<span class="msg-att-icon">' + icon + '</span>'
-            + '<span class="msg-att-name" title="' + escapeHtml(att.name) + '">' + escapeHtml(shortName) + '</span>';
-          attContainer.appendChild(card);
-        }
-        bubble.appendChild(attContainer);
-      } else if (parsed.attachments.length > 0) {
-        if (parsed.text.trim()) {
-          const contentEl = document.createElement('div');
-          contentEl.className = 'agent-content';
-          contentEl.innerHTML = highlightMentions(parsed.text);
-          bubble.appendChild(contentEl);
-        }
-        bubble.insertAdjacentHTML('beforeend', _buildAttachmentCards(parsed.attachments));
-      } else {
-        const contentEl = document.createElement('div');
-        contentEl.className = 'agent-content';
-        contentEl.innerHTML = highlightMentions(content);
-        bubble.appendChild(contentEl);
-      }
-    } else if (content) {
-      const contentEl = document.createElement('div');
-      contentEl.className = 'agent-content';
-      if (role === 'assistant') {
-        _renderContent(contentEl, content);
-      } else {
-        contentEl.textContent = content;
-      }
-      bubble.appendChild(contentEl);
-    }
+  if (role === 'user') {
+    _buildUserContent(bubble, content, attachmentMeta);
+  } else if (role === 'assistant') {
+    _buildAssistantContent(bubble, content, thinking, streaming);
   }
 
-  // ── 操作按钮（仅 assistant，流式结束后可见） ──
   if (role === 'assistant' && !streaming) {
     _ensureActions(bubble);
   }
@@ -230,10 +241,11 @@ const MessageRenderer = {
   _initialized: false,
 
   /** 初始化事件委托 */
-  init: function () {
+  init: function (containerEl) {
     if (this._initialized) return;
     this._initialized = true;
-    document.querySelector('.messages-inner').addEventListener('click', function (e) {
+    if (!containerEl) return;
+    containerEl.addEventListener('click', function (e) {
       const btn = e.target.closest('.msg-act-btn');
       if (!btn) return;
       const action = btn.dataset.action;

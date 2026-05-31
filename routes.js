@@ -232,6 +232,8 @@ module.exports = {
       { method: 'DELETE', pattern: /^\/api\/agents\/([^\/]+)$/,           handler: function (m, req, res) { agentRoutes.deleteAgent(decodeURIComponent(m[1]), res); } },
       { method: 'GET',    pattern: /^\/api\/agents\/([^\/]+)\/agents-md$/,handler: function (m, req, res) { agentRoutes.getAgentsMd(decodeURIComponent(m[1]), res); } },
       { method: 'PUT',    pattern: /^\/api\/agents\/([^\/]+)\/agents-md$/,handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } agentRoutes.putAgentsMd(decodeURIComponent(m[1]), b, res); }); } },
+      { method: 'GET',    pattern: /^\/api\/agents\/([^\/]+)\/tools-md$/, handler: function (m, req, res) { agentRoutes.getToolsMd(decodeURIComponent(m[1]), res); } },
+      { method: 'PUT',    pattern: /^\/api\/agents\/([^\/]+)\/tools-md$/, handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } agentRoutes.putToolsMd(decodeURIComponent(m[1]), b, res); }); } },
       { method: 'DELETE', pattern: /^\/api\/agents\/([^\/]+)\/bootstrap$/,handler: function (m, req, res) { agentRoutes.deleteBootstrap(decodeURIComponent(m[1]), res); } },
       { method: 'GET',    pattern: /^\/api\/agents\/([^\/]+)\/skills$/,   handler: function (m, req, res) { agentRoutes.getAgentSkills(decodeURIComponent(m[1]), res); } },
       { method: 'POST',   pattern: /^\/api\/agents\/([^\/]+)\/skills$/,   handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } agentRoutes.handleSkillAction(decodeURIComponent(m[1]), b, res); }); } },
@@ -252,7 +254,26 @@ module.exports = {
       { method: 'POST',   pattern: /^\/api\/log$/,                         handler: function (m, req, res) { debugTrace.handlePostLog(req, res, collectBody); } },
       { method: 'GET',    pattern: /^\/api\/logs$/,                        handler: function (m, req, res) { debugTrace.handleGetLogs(req, res); } },
       { method: 'POST',   pattern: /^\/api\/logs\/clear$/,                 handler: function (m, req, res) { debugTrace.handleClearLogs(req, res); } },
+      { method: 'POST',   pattern: /^\/api\/open-folder$/,                handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { _jsonRes(res, 413, {error:err.message}); return; } handleOpenFolder(b, res); }); } },
     ];
+
+    function handleOpenFolder(body, res) {
+      let dir;
+      if (body && body.agentId) {
+        dir = store.getAgentWorkspace(body.agentId);
+        if (!dir) { _jsonRes(res, 404, { error: 'Agent not found: ' + body.agentId }); return; }
+      } else {
+        dir = store.getDataDir();
+        if (!dir) { _jsonRes(res, 404, { error: 'No data directory' }); return; }
+      }
+      const cp = require('child_process');
+      if (process.platform === 'win32') {
+        cp.spawn('explorer', [dir], { shell: true, detached: true });
+      } else {
+        cp.spawn('open', [dir], { detached: true });
+      }
+      _jsonRes(res, 200, { success: true, path: dir });
+    }
 
     return {
       routes: ROUTES,

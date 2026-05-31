@@ -199,6 +199,12 @@ const Api = {
         body: JSON.stringify({ content: data.prompt }),
       }));
     }
+    if (data.toolsMd !== undefined) {
+      tasks.push(this._fetch('/api/agents/' + encodeURIComponent(agentId) + '/tools-md', {
+        method: 'PUT',
+        body: JSON.stringify({ content: data.toolsMd }),
+      }));
+    }
     await Promise.all(tasks);
     await this.fetchAgents();
   },

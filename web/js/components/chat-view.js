@@ -17,7 +17,7 @@ const ChatView = {
    * 初始化聊天视图
    */
   init: function () {
-    MessageRenderer.init();
+    MessageRenderer.init(document.querySelector('.messages-inner'));
     StreamRenderer.init();
     AttachmentBar.pendingAttachments = [];
     WelcomeView.updateAgentModeBar();

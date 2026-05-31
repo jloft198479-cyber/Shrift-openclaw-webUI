@@ -69,6 +69,8 @@ function toggleAgentMenu(btn) {
   dd.innerHTML = ''
     + '<button class="dropdown-item" data-action="edit" data-agent="' + escapeHtml(agentId) + '">✏️ 编辑</button>'
     + '<div class="dropdown-divider"></div>'
+    + '<button class="dropdown-item" data-action="open-folder" data-agent="' + escapeHtml(agentId) + '">📁 办公室</button>'
+    + '<div class="dropdown-divider"></div>'
     + '<button class="dropdown-item danger" data-action="delete-agent" data-agent="' + escapeHtml(agentId) + '">🗑 删除</button>';
 
   _positionDropdown(dd, btn);
@@ -81,6 +83,12 @@ function toggleAgentMenu(btn) {
 
     if (action === 'edit') {
       State.setState({ editingAgent: aname, activeModal: 'edit-agent' });
+    } else if (action === 'open-folder') {
+      try {
+        await fetch('/api/open-folder', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agentId: aname }) });
+      } catch (err) {
+        showToast('打开失败: ' + err.message, 3000, 'error');
+      }
     } else if (action === 'delete-agent') {
       if (confirm('确定删除助手「' + displayName + '」吗？')) {
         try {

@@ -21,13 +21,19 @@ function invalidateCache() {
   _agentsCacheTime = 0;
 }
 
+function _sanitizeFolderName(name) {
+  if (!name) return '';
+  return name.replace(/[\\\/:*?"<>|]/g, '').trim();
+}
+
 function _resolveSkills(skillIds) {
   const globalSkills = store.scanGlobalSkills();
   const extraSkills = store.scanExtraDirsSkills();
   const allSkills = globalSkills.concat(extraSkills);
   return skillIds.map(function (sid) {
     const found = allSkills.find(function (gs) { return gs.id === sid; });
-    return found || { id: sid, name: sid, description: '', icon: '' };
+    if (found) return found;
+    return { id: sid, name: sid, description: '', icon: '', missing: true };
   });
 }
 
@@ -63,7 +69,8 @@ function getAgentDetail(agentId, res) {
   if (!raw) { _jsonErr(res, 404, 'Agent not found'); return; }
   const ws = store.resolveHome(raw.workspace || '');
   const agentsMd = store.readFile(path.join(ws, 'AGENTS.md')) || '';
-  const teamSection = _extractTeamFromMd(agentsMd);
+  const toolsMd = store.readFile(path.join(ws, 'TOOLS.md')) || '';
+  const teamSection = _extractTeamFromToolsMd(toolsMd);
   const subagents = raw.subagents || {};
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({
@@ -79,20 +86,19 @@ function getAgentDetail(agentId, res) {
   }));
 }
 
-function _extractTeamFromMd(md) {
+function _extractTeamFromToolsMd(md) {
   if (!md) return [];
   const members = [];
   const lines = md.split('\n');
-  let inTeamSection = false;
+  let inTeam = false;
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (line.match(/^##\s+(Sub-Agents|Team Members)/)) { inTeamSection = true; continue; }
-    if (inTeamSection && line.match(/^##\s/)) { inTeamSection = false; continue; }
-    if (inTeamSection) {
-      const m = line.match(/^-\s+\*\*(.+?)\*\*\s+\((.+?)\)(?:\s+—\s+(.+))?$/);
+    if (line.match(/^##\s+团队成员/)) { inTeam = true; continue; }
+    if (inTeam && line.match(/^##\s+/)) { inTeam = false; continue; }
+    if (inTeam) {
+      const m = line.match(/^-\s+(.+?)(?:\s+—\s+(.+))?$/);
       if (m) {
-        const display = m[2].replace(/^[\u{1F300}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{200D}]\s*/u, '').trim();
-        members.push({ id: m[1], display: display, summary: m[3] || '' });
+        members.push({ display: m[1].trim(), summary: m[2] ? m[2].trim() : '' });
       }
     }
   }
@@ -143,15 +149,20 @@ function createAgent(body, res) {
   }
   const dataDir = store.getDataDir();
   const agentsDir = dataDir ? path.join(dataDir, 'agents') : '';
-  let wsPath = agentsDir ? path.join(agentsDir, 'workspace-' + id) : '';
-  const wsRelative = agentsDir ? wsPath : '~/.openclaw/workspace-' + id;
+  const safeName = _sanitizeFolderName(body.name) || id;
+  const wsName = 'workspace-' + safeName;
+  let wsPath = agentsDir ? path.join(agentsDir, wsName) : '';
+  const wsRelative = agentsDir ? wsPath : '~/.openclaw/' + wsName;
   if (!wsPath) {
     const home = process.env.USERPROFILE || process.env.HOME || '';
-    wsPath = path.join(home, '.openclaw', 'workspace-' + id);
+    wsPath = path.join(home, '.openclaw', wsName);
   }
-  if (!fs.existsSync(wsPath)) fs.mkdirSync(wsPath, { recursive: true });
+  if (fs.existsSync(wsPath)) { _jsonErr(res, 409, '工作目录已存在: ' + wsName); return; }
+  fs.mkdirSync(wsPath, { recursive: true });
   const prompt = body.prompt || '';
   if (prompt) store.writeFile(path.join(wsPath, 'AGENTS.md'), prompt);
+  const toolsMd = body.toolsMd || '';
+  if (toolsMd) store.writeFile(path.join(wsPath, 'TOOLS.md'), toolsMd);
   const avatar = body.avatar || '';
   const desc = body.description || '';
   const newAgent = { id: id, name: body.name, workspace: wsRelative, identity: { emoji: avatar }, description: desc };
@@ -189,6 +200,28 @@ function updateAgent(agentId, body, res) {
       if (Object.hasOwn(body, 'skills')) agentList[i].skills = body.skills;
       const ws = store.resolveHome(agentList[i].workspace || '');
       if (body.prompt && ws) store.writeFile(path.join(ws, 'AGENTS.md'), body.prompt);
+      // 工作目录名与名称不一致时自动重命名
+      if (Object.hasOwn(body, 'name') && ws && fs.existsSync(ws)) {
+        const safeName = _sanitizeFolderName(body.name);
+        if (safeName) {
+          const currentDirName = path.basename(ws);
+          const expectedDirName = 'workspace-' + safeName;
+          if (currentDirName !== expectedDirName) {
+            const parentDir = path.dirname(ws);
+            const newWsPath = path.join(parentDir, expectedDirName);
+            if (fs.existsSync(newWsPath)) {
+              _jsonErr(res, 409, '工作目录已存在: ' + expectedDirName); return;
+            }
+            try {
+              fs.renameSync(ws, newWsPath);
+              agentList[i].workspace = agentList[i].workspace.replace(currentDirName, expectedDirName);
+            } catch (e) {
+              console.error('[Agent] Rename workspace failed:', e.message);
+              _jsonErr(res, 500, '重命名工作目录失败: ' + e.message); return;
+            }
+          }
+        }
+      }
       break;
     }
   }
@@ -237,7 +270,26 @@ function putAgentsMd(agentId, body, res) {
   const ws = store.getAgentWorkspace(agentId);
   if (!ws) { _jsonErr(res, 404, 'Agent not found'); return; }
   if (store.writeFile(path.join(ws, 'AGENTS.md'), (body && body.content) || '')) {
+    rosterSync.syncAllRosters();
     invalidateCache();
+    _jsonOk(res);
+  } else { _jsonErr(res, 500, 'Write failed'); }
+}
+
+function getToolsMd(agentId, res) {
+  const ws = store.getAgentWorkspace(agentId);
+  if (!ws) { _jsonErr(res, 404, 'Agent not found'); return; }
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({ content: store.readFile(path.join(ws, 'TOOLS.md')) || '' }));
+}
+
+function putToolsMd(agentId, body, res) {
+  const ws = store.getAgentWorkspace(agentId);
+  if (!ws) { _jsonErr(res, 404, 'Agent not found'); return; }
+  let content = (body && body.content) || '';
+  content = rosterSync.stripSystemSection(content);
+  if (store.writeFile(path.join(ws, 'TOOLS.md'), content)) {
+    rosterSync.syncAllRosters();
     _jsonOk(res);
   } else { _jsonErr(res, 500, 'Write failed'); }
 }
@@ -267,7 +319,7 @@ function listSkills(res) {
       if (skillMap[sid]) {
         skillMap[sid].boundAgents.push(a.id);
       } else {
-        skillMap[sid] = { id: sid, name: sid, description: '', icon: '', source: 'config', boundAgents: [a.id] };
+        skillMap[sid] = { id: sid, name: sid, description: '', icon: '', source: 'config', boundAgents: [a.id], missing: true };
       }
     });
   });
@@ -356,6 +408,8 @@ module.exports = {
   deleteAgent: deleteAgent,
   getAgentsMd: getAgentsMd,
   putAgentsMd: putAgentsMd,
+  getToolsMd: getToolsMd,
+  putToolsMd: putToolsMd,
   deleteBootstrap: deleteBootstrap,
   listSkills: listSkills,
   getAgentSkills: getAgentSkills,

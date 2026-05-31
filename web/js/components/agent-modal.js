@@ -1,17 +1,37 @@
-const AVATAR_SOURCES = {
+var AVATAR_SOURCES = {
   packs: [
     { path: 'avatars/', files: [
       'male-james', 'male-michael', 'male-david', 'male-thomas',
       'male-daniel', 'male-alex', 'male-sam', 'male-leo',
       'female-emma', 'female-sophia', 'female-olivia', 'female-isabella',
       'female-mia', 'female-charlotte', 'female-amelia', 'female-harper',
+      'male-ethan', 'male-lucas', 'male-henry', 'male-owen',
+      'male-ryan', 'male-nathan', 'male-jack', 'male-max',
+      'female-lily', 'female-chloe', 'female-zoe', 'female-hazel',
+      'female-ivy', 'female-luna', 'female-stella', 'female-nora',
     ]},
   ],
 };
 
 const DEFAULT_AVATAR = AVATAR_SOURCES.packs[0].path + AVATAR_SOURCES.packs[0].files[0] + '.svg';
 
-const AgentModal = {
+var PROMPT_TEMPLATES = {
+  '#身份角色': '身份角色',
+  '#领域专业': '领域专业',
+  '#说话风格': '说话风格',
+  '#行为规范': '行为规范',
+  '#场景示例': '场景示例',
+  '#工作流程': '工作流程',
+};
+
+var TOOLS_TEMPLATES = {
+  '#选择偏好': '选择偏好',
+  '#环境信息': '环境信息',
+  '#使用心得': '使用心得',
+  '#设备别名': '设备别名',
+};
+
+var AgentModal = {
   _unsub: null,
 
   init: function() {
@@ -19,7 +39,7 @@ const AgentModal = {
   },
 
   render: function() {
-    const modal = State.activeModal;
+    var modal = State.activeModal;
     if (!modal) {
       this._close();
       return;
@@ -29,14 +49,14 @@ const AgentModal = {
   },
 
   _close: function() {
-    const el = document.querySelector('.modal-overlay');
+    var el = document.querySelector('.modal-overlay');
     if (el) el.remove();
   },
 
   _showCreate: function() {
     this._renderForm({
       title: '新建助手',
-      data: { name: '', description: '', prompt: '', avatar: DEFAULT_AVATAR, skills: [] },
+      data: { name: '', description: '', prompt: '', toolsMd: '', avatar: DEFAULT_AVATAR, skills: [] },
       onSave: function(data) {
         return Api.createAgent(data).then(function() {
           State.setState({ activeModal: null });
@@ -49,87 +69,207 @@ const AgentModal = {
   },
 
   _showEdit: function() {
-    const agentId = State.editingAgent;
+    var agentId = State.editingAgent;
     if (!agentId) return;
-    const agent = State.findAgent(agentId);
+    var agent = State.findAgent(agentId);
     if (!agent) return;
 
-    const self = this;
+    var self = this;
     Api.fetchAgentDetail(agentId).then(function(detail) {
-      self._renderForm({
-        title: '编辑助手',
-        data: {
-          name: agent.name || agent.id,
-          description: agent.description || '',
-          prompt: detail.agentsMd || '',
-          avatar: agent.avatar || DEFAULT_AVATAR,
-          skills: (agent.skills || []).map(function(s) { return s.id; }),
-          model: detail.model || agent.model || '',
-        },
-        isEdit: true,
-        agentId: agentId,
-        teamMembers: detail.teamMembers || [],
-        allowAgents: detail.allowAgents || [],
-        onSave: function(data) {
-          return Api.updateAgent(agentId, data).then(function() {
-            State.setState({ activeModal: null, editingAgent: null });
-            showToast('助手已更新');
-          }).catch(function(err) {
-            showToast('更新失败: ' + (err.message || '未知错误'));
-          });
-        },
+      Api._fetch('/api/agents/' + encodeURIComponent(agentId) + '/tools-md').then(function(td) {
+        var toolsMd = td ? td.content || '' : '';
+        var sysPart = '';
+        var userPart = toolsMd;
+        var sysStart = '<!-- system-sync-start -->';
+        var sysEnd = '<!-- system-sync-end -->';
+        var si = toolsMd.indexOf(sysStart);
+        var ei = toolsMd.indexOf(sysEnd);
+        if (si >= 0 && ei > si) {
+          sysPart = toolsMd.slice(si + sysStart.length, ei).trim();
+          userPart = toolsMd.slice(0, si).trim();
+        }
+        self._renderEditForm(agent, agentId, detail, userPart, sysPart);
+      }).catch(function() {
+        self._renderEditForm(agent, agentId, detail, '', '');
       });
     }).catch(function(err) {
       showToast('加载失败: ' + (err.message || '未知错误'));
     });
   },
 
-  _buildAvatarPicker: function(currentAvatar) {
-    let html = '<div id="avatar-picker" class="avatar-picker-unified">';
+  _renderEditForm: function(agent, agentId, detail, toolsMd, sysPart) {
+    var self = this;
+    self._renderForm({
+      title: '编辑助手',
+      data: {
+        name: agent.name || agent.id,
+        description: agent.description || '',
+        prompt: detail.agentsMd || '',
+        toolsMd: toolsMd || '',
+        sysPart: sysPart || '',
+        avatar: agent.avatar || DEFAULT_AVATAR,
+        skills: (agent.skills || []).map(function(s) { return s.id; }),
+        model: detail.model || agent.model || '',
+      },
+      isEdit: true,
+      agentId: agentId,
+      teamMembers: detail.teamMembers || [],
+      allowAgents: detail.allowAgents || [],
+      onSave: function(data) {
+        return Api.updateAgent(agentId, data).then(function() {
+          State.setState({ activeModal: null, editingAgent: null });
+          showToast('助手已更新');
+        }).catch(function(err) {
+          showToast('更新失败: ' + (err.message || '未知错误'));
+        });
+      },
+    });
+  },
 
+  _buildAvatarPicker: function(currentAvatar) {
+    var html = '<div id="avatar-picker" class="avatar-picker-unified">';
     AVATAR_SOURCES.packs.forEach(function(pack) {
       html += '<div class="avatar-group"><div class="avatar-group-items avatar-grid">';
       pack.files.forEach(function(f) {
-        const val = pack.path + f + '.svg';
-        const sel = val === currentAvatar ? ' selected' : '';
+        var val = pack.path + f + '.svg';
+        var sel = val === currentAvatar ? ' selected' : '';
         html += '<div class="avatar-option img-option' + sel + '" data-avatar="' + val + '">'
           + '<img src="' + val + '" alt="" loading="lazy">'
           + '</div>';
       });
       html += '</div></div>';
     });
-
     html += '</div>';
     return html;
   },
 
+  _buildTagsHtml: function(tags) {
+    var html = '<div class="prompt-tags">';
+    tags.forEach(function(t) {
+      html += '<span class="prompt-tag" data-tag="' + t + '">' + t + '</span>';
+    });
+    html += '</div>';
+    return html;
+  },
+
+  _buildEditorHtml: function(id, markdown, placeholder) {
+    var html = '<div class="md-editor" data-editor-id="' + id + '">'
+      + '<div class="md-toolbar">'
+      + '  <button class="md-btn" data-cmd="h2" title="标题">H</button>'
+      + '  <button class="md-btn" data-cmd="bold" title="加粗">B</button>'
+      + '  <button class="md-btn" data-cmd="italic" title="斜体">I</button>'
+      + '  <span class="md-sep"></span>'
+      + '  <button class="md-btn" data-cmd="ul" title="无序列表">•≡</button>'
+      + '  <button class="md-btn" data-cmd="ol" title="有序列表">1.</button>'
+      + '  <span class="md-sep"></span>'
+      + '  <button class="md-btn" data-cmd="code" title="代码">⟨⟩</button>'
+      + '  <button class="md-btn" data-cmd="link" title="链接">🔗</button>'
+      + '</div>'
+      + '<div class="md-content" contenteditable="true" data-placeholder="' + escapeHtml(placeholder) + '">'
+      + '</div>'
+      + '<textarea id="' + id + '" style="display:none">' + escapeHtml(markdown) + '</textarea>'
+      + '</div>';
+    return html;
+  },
+
+  _initEditor: function(editorEl) {
+    var textarea = editorEl.querySelector('textarea');
+    var content = editorEl.querySelector('.md-content');
+    var md = textarea.value || '';
+    if (md && typeof marked !== 'undefined') {
+      content.innerHTML = marked.parse(md);
+      content.querySelectorAll('strong').forEach(function(el) {
+        var text = el.textContent.trim();
+        var isTagLabel = Object.values(PROMPT_TEMPLATES).indexOf(text) >= 0
+          || Object.values(TOOLS_TEMPLATES).indexOf(text) >= 0;
+        if (isTagLabel) {
+          var span = document.createElement('span');
+          span.className = 'md-inline-tag';
+          span.contentEditable = 'false';
+          span.textContent = text;
+          el.replaceWith(span);
+        }
+      });
+    } else if (md) {
+      content.textContent = md;
+    }
+    content.addEventListener('input', function() {
+      if (typeof TurndownService !== 'undefined') {
+        var td = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
+        td.addRule('inlineTag', {
+          filter: function(node) { return node.nodeName === 'SPAN' && node.className === 'md-inline-tag'; },
+          replacement: function(content) { return '**' + content + '**'; }
+        });
+        textarea.value = td.turndown(content.innerHTML);
+      } else {
+        textarea.value = content.innerText;
+      }
+    });
+  },
+
+  _execEditorCmd: function(contentEl, cmd) {
+    contentEl.focus();
+    var sel = window.getSelection();
+    var range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+    switch (cmd) {
+      case 'bold':
+        document.execCommand('bold', false, null);
+        break;
+      case 'italic':
+        document.execCommand('italic', false, null);
+        break;
+      case 'h2':
+        document.execCommand('formatBlock', false, '<h2>');
+        break;
+      case 'ul':
+        document.execCommand('insertUnorderedList', false, null);
+        break;
+      case 'ol':
+        document.execCommand('insertOrderedList', false, null);
+        break;
+      case 'code':
+        var text = sel.toString();
+        if (text) {
+          document.execCommand('insertHTML', false, '<code>' + escapeHtml(text) + '</code>');
+        }
+        break;
+      case 'link':
+        var linkText = sel.toString() || '链接';
+        document.execCommand('insertHTML', false, '<a href="#">' + escapeHtml(linkText) + '</a>');
+        break;
+    }
+    contentEl.dispatchEvent(new Event('input'));
+  },
+
   _renderForm: function(opts) {
-    const data = opts.data;
-    const isEdit = opts.isEdit || false;
+    var data = opts.data;
+    var isEdit = opts.isEdit || false;
 
     function buildModelOptions(currentModel) {
-      const models = State.models || [];
-      const defModel = State.defaultModel || '';
-      const selected = currentModel || defModel || '';
-      let html = '<option value="">默认 (' + escapeHtml(defModel || '未配置') + ')</option>';
+      var models = State.models || [];
+      var defModel = State.defaultModel || '';
+      var selected = currentModel || defModel || '';
+      var html = '<option value="">默认 (' + escapeHtml(defModel || '未配置') + ')</option>';
       models.forEach(function(m) {
         html += '<option value="' + escapeHtml(m.id) + '"' + (m.id === selected ? ' selected' : '') + '>' + escapeHtml(m.name) + '</option>';
       });
       return html;
     }
 
-    const selectedSkills = data.skills || [];
-    const availableSkills = State.skills || [];
+    var selectedSkills = data.skills || [];
+    var availableSkills = State.skills || [];
 
-    let skillsHtml = '';
+    var skillsHtml = '';
     if (availableSkills.length > 0) {
       skillsHtml = '<div class="skills-grid">';
       availableSkills.forEach(function(sk) {
-        const skId = sk.id || sk.name;
-        const isSelected = selectedSkills.indexOf(skId) >= 0;
-        skillsHtml += '<div class="skill-option' + (isSelected ? ' selected' : '') + '" data-skill="' + escapeHtml(skId) + '">'
-          + '<span class="skill-option-icon">' + (sk.icon || '') + '</span>'
-          + '<span class="skill-option-label">' + escapeHtml(sk.label || sk.name || skId) + '</span>'
+        var skId = sk.id || sk.name;
+        var isSelected = selectedSkills.indexOf(skId) >= 0;
+        var isMissing = sk.missing === true;
+        var cls = 'skill-option' + (isSelected ? ' selected' : '') + (isMissing ? ' skill-missing' : '');
+        var label = isMissing ? '⚠ ' + escapeHtml(sk.label || sk.name || skId) + ' (未找到)' : (sk.icon || '') + escapeHtml(sk.label || sk.name || skId);
+        skillsHtml += '<div class="' + cls + '" data-skill="' + escapeHtml(skId) + '" title="' + (isMissing ? '该技能文件不存在，请重新绑定或删除' : '') + '">'
+          + '<span class="skill-option-label">' + label + '</span>'
           + '</div>';
       });
       skillsHtml += '</div>';
@@ -137,7 +277,21 @@ const AgentModal = {
       skillsHtml = '<div class="empty-state" style="padding:12px;font-size:12px;">暂无可用技能</div>';
     }
 
-    const overlay = document.createElement('div');
+    var teamHtml = '';
+    if (opts.teamMembers && opts.teamMembers.length > 0) {
+      teamHtml = '<div class="form-section" style="margin-top:16px;">'
+        + '<label class="section-label">团队成员</label>'
+        + '<div class="team-members-grid">'
+        + opts.teamMembers.map(function(m) {
+            return '<div class="team-member-card">'
+              + '<span class="team-member-id">' + escapeHtml(m.display || m.id) + '</span>'
+              + (m.summary ? '<span class="team-member-summary">' + escapeHtml(m.summary) + '</span>' : '')
+              + '</div>';
+          }).join('')
+        + '</div></div>';
+    }
+
+    var overlay = document.createElement('div');
     overlay.className = 'modal-overlay';
 
     overlay.innerHTML = ''
@@ -146,63 +300,61 @@ const AgentModal = {
       + '    <h3>' + escapeHtml(opts.title) + '</h3>'
       + '    <button class="modal-close" data-action="close">×</button>'
       + '  </div>'
+      + '  <div class="modal-tabs">'
+      + '    <button class="modal-tab active" data-tab="basic">基本信息</button>'
+      + '    <button class="modal-tab" data-tab="prompt">详情介绍</button>'
+      + '    <button class="modal-tab" data-tab="tools">工具备忘录</button>'
+      + '    <button class="modal-tab" data-tab="skills">技能与模型</button>'
+      + '  </div>'
       + '  <div class="modal-body">'
-      + '    <div class="form-section">'
-      + '      <div class="form-row">'
-      + '        <div class="form-field flex-1">'
-      + '          <label>名称</label>'
-      + '          <input type="text" id="agent-name" value="' + escapeHtml(data.name) + '" placeholder="助手名称" maxlength="20">'
-      + '        </div>'
-      + '        <div class="form-field flex-1">'
-      + '          <label>简介</label>'
-      + '          <input type="text" id="agent-desc" value="' + escapeHtml(data.description) + '" placeholder="一句话介绍" maxlength="40">'
+      + '    <div class="tab-panel active" data-panel="basic">'
+      + '      <div class="form-section">'
+      + '        <div class="form-row">'
+      + '          <div class="form-field flex-1">'
+      + '            <label>名称</label>'
+      + '            <input type="text" id="agent-name" value="' + escapeHtml(data.name) + '" placeholder="助手名称" maxlength="20">'
+      + '          </div>'
+      + '          <div class="form-field flex-1">'
+      + '            <label>简介</label>'
+      + '            <input type="text" id="agent-desc" value="' + escapeHtml(data.description) + '" placeholder="一句话介绍" maxlength="40">'
+      + '          </div>'
       + '        </div>'
       + '      </div>'
-      + '    </div>'
-      + '    <div class="form-divider"></div>'
-      + '    <div class="form-section">'
-      + '      <label class="section-label">头像</label>'
+      + '      <div class="form-divider"></div>'
+      + '      <div class="form-section">'
+      + '        <label class="section-label">头像</label>'
       + this._buildAvatarPicker(data.avatar || DEFAULT_AVATAR)
-      + '    </div>'
-      + '    <div class="form-divider"></div>'
-      + '    <div class="form-section">'
-      + '      <label class="section-label">详情介绍</label>'
-      + '      <div class="prompt-tags">'
-      + '        <span class="prompt-tag" data-tag="#身份角色">#身份角色</span>'
-      + '        <span class="prompt-tag" data-tag="#领域专业">#领域专业</span>'
-      + '        <span class="prompt-tag" data-tag="#说话风格">#说话风格</span>'
-      + '        <span class="prompt-tag" data-tag="#行为规范">#行为规范</span>'
-      + '        <span class="prompt-tag" data-tag="#场景示例">#场景示例</span>'
-      + '        <span class="prompt-tag" data-tag="#工作流程">#工作流程</span>'
       + '      </div>'
-      + '      <textarea id="agent-prompt" placeholder="点击上方标签插入提示，自由组合…" rows="15">' + escapeHtml(data.prompt || '') + '</textarea>'
       + '    </div>'
-      + '    <div class="form-divider"></div>'
-      + '    <div class="form-section">'
-      + '      <label class="section-label">技能</label>'
+      + '    <div class="tab-panel" data-panel="prompt">'
+      + '      <div class="form-section">'
+      + '        <label class="section-label">详情介绍 <span class="section-hint">定义助手是谁、怎么说话、行为规范</span></label>'
+      + this._buildTagsHtml(['#身份角色', '#领域专业', '#说话风格', '#行为规范', '#场景示例', '#工作流程'])
+      + this._buildEditorHtml('agent-prompt', data.prompt || '', '点击上方标签插入提示，自由组合…')
+      + '      </div>'
+      + '    </div>'
+      + '    <div class="tab-panel" data-panel="tools">'
+      + '      <div class="form-section">'
+      + '        <label class="section-label">工具备忘录 <span class="section-hint">环境信息、选择偏好、使用心得</span></label>'
+      + this._buildTagsHtml(['#选择偏好', '#环境信息', '#使用心得', '#设备别名'])
+      + this._buildEditorHtml('agent-tools', data.toolsMd || '', '记录工具的环境信息和选择偏好，比如"搜索知乎优先用 API"…')
+      + '      </div>'
+      + (data.sysPart ? '<div class="form-section" style="margin-top:12px;"><label class="section-label">自动同步信息 <span class="section-hint">由系统维护，修改技能或团队时自动更新</span></label><div class="sys-sync-preview">' + (typeof marked !== 'undefined' ? marked.parse(data.sysPart) : escapeHtml(data.sysPart)) + '</div></div>' : '')
+      + '    </div>'
+      + '    <div class="tab-panel" data-panel="skills">'
+      + '      <div class="form-section">'
+      + '        <label class="section-label">技能</label>'
       + skillsHtml
-      + '    </div>'
-      + '    <div class="form-divider"></div>'
-      + '    <div class="form-section">'
-      + '      <label class="section-label">语言模型</label>'
-      + '      <select id="agent-model" class="agent-model-select">'
+      + '      </div>'
+      + '      <div class="form-divider"></div>'
+      + '      <div class="form-section">'
+      + '        <label class="section-label">语言模型</label>'
+      + '        <select id="agent-model" class="agent-model-select">'
       + buildModelOptions(data.model)
-      + '      </select>'
+      + '        </select>'
+      + '      </div>'
+      + teamHtml
       + '    </div>'
-      + (opts.teamMembers && opts.teamMembers.length > 0 ? (
-        '    <div class="form-divider"></div>'
-        + '    <div class="form-section">'
-        + '      <label class="section-label">团队成员</label>'
-        + '      <div class="team-members-grid">'
-        + opts.teamMembers.map(function(m) {
-            return '<div class="team-member-card">'
-              + '<span class="team-member-id">' + escapeHtml(m.display || m.id) + '</span>'
-              + (m.summary ? '<span class="team-member-summary">' + escapeHtml(m.summary) + '</span>' : '')
-              + '</div>';
-          }).join('')
-        + '      </div>'
-        + '    </div>'
-      ) : '')
       + '  </div>'
       + '  <div class="modal-footer">'
       + '    <button class="modal-btn secondary" data-action="close">取消</button>'
@@ -212,8 +364,12 @@ const AgentModal = {
 
     document.body.appendChild(overlay);
 
-    const self = this;
+    var self = this;
     this._currentOpts = opts;
+
+    overlay.querySelectorAll('.md-editor').forEach(function(el) {
+      self._initEditor(el);
+    });
 
     overlay.addEventListener('click', function(e) {
       if (e.target === overlay) {
@@ -221,7 +377,7 @@ const AgentModal = {
         return;
       }
 
-      const actionBtn = e.target.closest('[data-action]');
+      var actionBtn = e.target.closest('[data-action]');
       if (actionBtn) {
         if (actionBtn.dataset.action === 'close') {
           State.setState({ activeModal: null, editingAgent: null });
@@ -233,71 +389,101 @@ const AgentModal = {
         }
       }
 
-      const avatarOpt = e.target.closest('.avatar-option');
+      var tabBtn = e.target.closest('.modal-tab');
+      if (tabBtn) {
+        var tabId = tabBtn.dataset.tab;
+        overlay.querySelectorAll('.modal-tab').forEach(function(t) { t.classList.remove('active'); });
+        overlay.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+        tabBtn.classList.add('active');
+        var panel = overlay.querySelector('.tab-panel[data-panel="' + tabId + '"]');
+        if (panel) panel.classList.add('active');
+        return;
+      }
+
+      var avatarOpt = e.target.closest('.avatar-option');
       if (avatarOpt) {
         overlay.querySelectorAll('.avatar-option').forEach(function(el) { el.classList.remove('selected'); });
         avatarOpt.classList.add('selected');
         return;
       }
 
-      const skillOpt = e.target.closest('.skill-option');
+      var skillOpt = e.target.closest('.skill-option');
       if (skillOpt) {
         skillOpt.classList.toggle('selected');
         return;
       }
 
-      const promptTag = e.target.closest('.prompt-tag');
+      var mdBtn = e.target.closest('.md-btn');
+      if (mdBtn) {
+        var cmd = mdBtn.dataset.cmd;
+        var editor = mdBtn.closest('.md-editor');
+        var contentEl = editor ? editor.querySelector('.md-content') : null;
+        if (contentEl) self._execEditorCmd(contentEl, cmd);
+        return;
+      }
+
+      var promptTag = e.target.closest('.prompt-tag');
       if (promptTag) {
         promptTag.classList.add('tag-clicked');
         setTimeout(function () { promptTag.classList.remove('tag-clicked'); }, 300);
-        const textarea = document.getElementById('agent-prompt');
-        if (textarea) {
-          const tag = promptTag.dataset.tag;
-          const tagLabel = tag.replace(/^#/, '');
-          const templates = {
-            '#身份角色': '\n## ' + tagLabel + '\n\n',
-            '#领域专业': '\n## ' + tagLabel + '\n\n',
-            '#说话风格': '\n## ' + tagLabel + '\n\n',
-            '#行为规范': '\n## ' + tagLabel + '\n\n',
-            '#场景示例': '\n## ' + tagLabel + '\n\n- \n\n',
-            '#工作流程': '\n## ' + tagLabel + '\n\n1. \n2. \n3. \n\n',
-          };
-          const tagText = templates[tag] || ('\n## ' + tagLabel + '\n\n');
-          const start = textarea.selectionStart;
-          const end = textarea.selectionEnd;
-          const before = textarea.value.substring(0, start);
-          const after = textarea.value.substring(end);
-          let val = before + tagText + after;
-          if (!val.endsWith('\n')) val += '\n';
-          textarea.value = val;
-          const cursorPos = start + tagText.length;
-          textarea.selectionStart = textarea.selectionEnd = cursorPos;
-          textarea.focus();
+        var tag = promptTag.dataset.tag;
+        var tabPanel = promptTag.closest('.tab-panel');
+        var editorEl = tabPanel ? tabPanel.querySelector('.md-editor') : null;
+        var contentEl = editorEl ? editorEl.querySelector('.md-content') : null;
+        var textarea = editorEl ? editorEl.querySelector('textarea') : null;
+        var templates = tabPanel && tabPanel.dataset.panel === 'tools' ? TOOLS_TEMPLATES : PROMPT_TEMPLATES;
+        if (contentEl && textarea) {
+          var tagLabel = templates[tag] || tag.replace(/^#/, '');
+          contentEl.focus();
+          var sel = window.getSelection();
+          if (sel.rangeCount > 0) {
+            var range = sel.getRangeAt(0);
+            range.deleteContents();
+            var tagNode = document.createElement('span');
+            tagNode.className = 'md-inline-tag';
+            tagNode.contentEditable = 'false';
+            tagNode.textContent = tagLabel;
+            var spaceNode = document.createTextNode('\u00A0');
+            var frag = document.createDocumentFragment();
+            frag.appendChild(tagNode);
+            frag.appendChild(spaceNode);
+            range.insertNode(frag);
+            range.setStartAfter(spaceNode);
+            range.collapse(true);
+            sel.removeAllRanges();
+            sel.addRange(range);
+          } else {
+            contentEl.insertAdjacentHTML('beforeend',
+              '<span class="md-inline-tag" contenteditable="false">' + escapeHtml(tagLabel) + '</span>&nbsp;');
+          }
+          contentEl.dispatchEvent(new Event('input'));
         }
       }
     });
   },
 
   _collectAndSave: function() {
-    const name = document.getElementById('agent-name');
-    const desc = document.getElementById('agent-desc');
-    const prompt = document.getElementById('agent-prompt');
+    var name = document.getElementById('agent-name');
+    var desc = document.getElementById('agent-desc');
+    var prompt = document.getElementById('agent-prompt');
+    var tools = document.getElementById('agent-tools');
 
-    const selOpt = document.querySelector('.avatar-option.selected');
-    const selectedAvatar = selOpt ? selOpt.dataset.avatar : DEFAULT_AVATAR;
+    var selOpt = document.querySelector('.avatar-option.selected');
+    var selectedAvatar = selOpt ? selOpt.dataset.avatar : DEFAULT_AVATAR;
 
-    const data = {
+    var data = {
       name: name ? name.value.trim() : '',
       description: desc ? desc.value.trim() : '',
       prompt: prompt ? prompt.value.trim() : '',
+      toolsMd: tools ? tools.value.trim() : '',
       avatar: selectedAvatar,
       skills: [],
     };
 
-    const selectedSkillNodes = document.querySelectorAll('.skill-option.selected');
+    var selectedSkillNodes = document.querySelectorAll('.skill-option.selected');
     selectedSkillNodes.forEach(function(el) { data.skills.push(el.dataset.skill); });
 
-    const modelSelect = document.getElementById('agent-model');
+    var modelSelect = document.getElementById('agent-model');
     if (modelSelect && modelSelect.value) {
       data.model = modelSelect.value;
     }
