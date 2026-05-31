@@ -2,7 +2,6 @@
 
 const AttachmentBar = {
   pendingAttachments: [],
-  MAX_FILE_SIZE: 10 * 1024 * 1024,
 
   /**
    * 添加文件到待上传列表
@@ -10,10 +9,6 @@ const AttachmentBar = {
   handleFiles: function (files) {
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      if (file.size > this.MAX_FILE_SIZE) {
-        showToast('文件 "' + file.name + '" 超过 10MB 限制');
-        continue;
-      }
       const att = {
         id: 'att-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6),
         file: file,
@@ -100,26 +95,75 @@ const AttachmentBar = {
     const results = [];
     for (let i = 0; i < this.pendingAttachments.length; i++) {
       const att = this.pendingAttachments[i];
+      let fileToRead = att.file;
+      let finalType = att.type;
+
+      if (att.type && att.type.indexOf('image/') === 0 && att.type !== 'image/svg+xml' && att.type !== 'image/gif') {
+        try {
+          const compressed = await this._compressImage(att.file);
+          if (compressed) {
+            fileToRead = compressed.blob;
+            finalType = compressed.type;
+          }
+        } catch (e) {}
+      }
+
       const reader = new FileReader();
       const dataUrl = await new Promise(function (resolve) {
         reader.onload = function () { resolve(reader.result); };
-        reader.readAsDataURL(att.file);
+        reader.readAsDataURL(fileToRead);
       });
       const resp = await fetch('/api/upload', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: att.name, type: att.type, data: dataUrl }),
+        body: JSON.stringify({ name: att.name, type: finalType, data: dataUrl }),
       });
       if (!resp.ok) {
         const err = await resp.json().catch(function () { return {}; });
         throw new Error(err.error || '上传失败 (HTTP ' + resp.status + ')');
       }
       const result = await resp.json();
-      // 保留 dataUrl 供 API 消息构建使用（图片用 data: URL 传给 Gateway，无需回调）
       result.dataUrl = dataUrl;
       results.push(result);
     }
     return results;
+  },
+
+  _compressImage: function (file) {
+    return new Promise(function (resolve) {
+      const img = new Image();
+      img.onload = function () {
+        URL.revokeObjectURL(img.src);
+        let w = img.width;
+        let h = img.height;
+        const MAX_DIM = 1024;
+        if (w <= MAX_DIM && h <= MAX_DIM) {
+          resolve(null);
+          return;
+        }
+        if (w > h) {
+          h = Math.round(h * MAX_DIM / w);
+          w = MAX_DIM;
+        } else {
+          w = Math.round(w * MAX_DIM / h);
+          h = MAX_DIM;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        var ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(function (blob) {
+          if (!blob || blob.size >= file.size) {
+            resolve(null);
+            return;
+          }
+          resolve({ blob: blob, type: 'image/jpeg' });
+        }, 'image/jpeg', 0.85);
+      };
+      img.onerror = function () { resolve(null); };
+      img.src = URL.createObjectURL(file);
+    });
   },
 
   /**

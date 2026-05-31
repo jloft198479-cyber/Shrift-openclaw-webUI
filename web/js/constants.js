@@ -80,10 +80,6 @@ const Constants = {
   // ═══ 文件大小（字节）═══
 
   FILE: {
-    /** 单文件上传大小上限 */
-    MAX_SIZE: 10 * 1024 * 1024,  // 10MB
-    /** dataUrl 内嵌阈值 */
-    DATA_URL_THRESHOLD: 512000,  // 500KB
     /** 1KB */
     KB: 1024,
     /** 1MB */
@@ -146,4 +142,3 @@ const Constants = {
 
 // ═══ 向后兼容：保留原有常量 ═══
 
-const MAX_FILE_SIZE = Constants.FILE.MAX_SIZE;
