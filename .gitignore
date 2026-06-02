@@ -22,4 +22,5 @@ _test-a.ps1
 _syntax_check.ps1
 _handoff-*.md
 _agent-skill-tools-analysis.md
+.shrift-pid
 docs/

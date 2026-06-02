@@ -148,14 +148,13 @@ function createAgent(body, res) {
     if (agentList[i].id === id) { _jsonErr(res, 409, 'Agent ID already exists'); return; }
   }
   const dataDir = store.getDataDir();
-  const agentsDir = dataDir ? path.join(dataDir, 'agents') : '';
   const safeName = _sanitizeFolderName(body.name) || id;
   const wsName = 'workspace-' + safeName;
-  let wsPath = agentsDir ? path.join(agentsDir, wsName) : '';
-  const wsRelative = agentsDir ? wsPath : '~/.openclaw/' + wsName;
-  if (!wsPath) {
-    const home = process.env.USERPROFILE || process.env.HOME || '';
-    wsPath = path.join(home, '.openclaw', wsName);
+  const home = process.env.USERPROFILE || process.env.HOME || '';
+  let wsPath = path.join(home, '.openclaw', wsName);
+  const wsRelative = '~/.openclaw/' + wsName;
+  if (dataDir) {
+    wsPath = path.join(dataDir, wsName);
   }
   if (fs.existsSync(wsPath)) { _jsonErr(res, 409, '工作目录已存在: ' + wsName); return; }
   fs.mkdirSync(wsPath, { recursive: true });
@@ -174,9 +173,9 @@ function createAgent(body, res) {
   _ensureInAllowAgents(agentList, id);
   if (_saveAgentList(data, agentList)) {
     invalidateCache();
-    rosterSync.syncAllRosters();
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true, id: id }));
+    rosterSync.syncAllRosters();
   } else { _jsonErr(res, 500, 'Failed to write config'); }
 }
 
@@ -229,8 +228,8 @@ function updateAgent(agentId, body, res) {
   _ensureInAllowAgents(agentList, agentId);
   if (_saveAgentList(data, agentList)) {
     invalidateCache();
-    rosterSync.syncAllRosters();
     _jsonOk(res);
+    rosterSync.syncAllRosters();
   } else { _jsonErr(res, 500, 'Failed to write config'); }
 }
 
@@ -253,9 +252,9 @@ function deleteAgent(agentId, res) {
   _removeFromAllowAgents(agentList, agentId);
   if (_saveAgentList(data, agentList)) {
     invalidateCache();
+    _jsonOk(res);
     rosterSync.syncAllRosters();
     if (deletedWorkspace) store.cleanupWorkspace(deletedWorkspace);
-    _jsonOk(res);
   } else { _jsonErr(res, 500, 'Failed to write config'); }
 }
 
@@ -270,9 +269,9 @@ function putAgentsMd(agentId, body, res) {
   const ws = store.getAgentWorkspace(agentId);
   if (!ws) { _jsonErr(res, 404, 'Agent not found'); return; }
   if (store.writeFile(path.join(ws, 'AGENTS.md'), (body && body.content) || '')) {
-    rosterSync.syncAllRosters();
     invalidateCache();
     _jsonOk(res);
+    rosterSync.syncAllRosters();
   } else { _jsonErr(res, 500, 'Write failed'); }
 }
 
@@ -289,8 +288,8 @@ function putToolsMd(agentId, body, res) {
   let content = (body && body.content) || '';
   content = rosterSync.stripSystemSection(content);
   if (store.writeFile(path.join(ws, 'TOOLS.md'), content)) {
-    rosterSync.syncAllRosters();
     _jsonOk(res);
+    rosterSync.syncAllRosters();
   } else { _jsonErr(res, 500, 'Write failed'); }
 }
 
@@ -341,8 +340,8 @@ function _applySkillChange(agentId, skillIds, res) {
   if (!data) { _jsonErr(res, 500, 'Cannot read config'); return; }
   if (!store.patchAgentField(agentId, 'skills', skillIds)) { _jsonErr(res, 500, 'Failed to write config'); return; }
   invalidateCache();
-  rosterSync.syncAllRosters();
   _jsonOk(res);
+  rosterSync.syncAllRosters();
 }
 
 function handleSkillAction(agentId, body, res) {

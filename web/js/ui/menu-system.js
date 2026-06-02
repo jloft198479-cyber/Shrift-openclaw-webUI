@@ -93,8 +93,8 @@ function toggleAgentMenu(btn) {
       if (confirm('确定删除助手「' + displayName + '」吗？')) {
         try {
           await Api._fetch('/api/agents/' + encodeURIComponent(aname), { method: 'DELETE' });
-          if (State.currentAgent === aname) SessionManager.exitAgentMode();
           await Api.fetchAgents();
+          if (State.currentAgent === aname) SessionManager.exitAgentMode();
           showToast('助手已删除', 2000, 'info');
         } catch (err) {
           showToast('删除失败: ' + err.message, 3000, 'error');

@@ -253,11 +253,12 @@ function syncAllRosters() {
   const list = (data.agents && data.agents.list) || [];
   if (!Array.isArray(list)) return;
   if (_validateAllowAgents(list)) {
-    store.writeConfig(data);
+    try { store.writeConfig(data); } catch (e) { console.error('[Roster] writeConfig failed:', e.message); }
   }
   syncTeamRoster();
   for (let i = 0; i < list.length; i++) {
-    syncSubAgentRoster(list[i].id, list);
+    try { syncSubAgentRoster(list[i].id, list); }
+    catch (e) { console.error('[Roster] syncSubAgentRoster failed for ' + list[i].id + ':', e.message); }
   }
 }
 

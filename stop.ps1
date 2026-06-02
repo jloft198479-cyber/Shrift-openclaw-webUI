@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Continue'
 
+$PID_FILE = "$PSScriptRoot\.shrift-pid"
 $CONFIG_JSON = "$PSScriptRoot\config.json"
 $GATEWAY_PORT = 18789
 $WEB_PORT = 3001
@@ -15,22 +16,50 @@ if (Test-Path $CONFIG_JSON) {
     } catch {}
 }
 
+function Stop-ByPid {
+    param([string]$Label, [int]$ProcId)
+    if ($ProcId -le 0) { return $false }
+    try {
+        $proc = Get-Process -Id $ProcId -ErrorAction SilentlyContinue
+        if ($proc) {
+            Write-Host "[..] Stopping $Label (PID $ProcId)..." -ForegroundColor Yellow
+            Stop-Process -Id $ProcId -Force -ErrorAction SilentlyContinue
+            return $true
+        }
+    } catch {}
+    return $false
+}
+
 function Stop-ByPort {
     param([int]$Port)
     try {
         $conns = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique
-        foreach ($pid in $conns) {
-            Write-Host "[..] Killing PID $pid on port $Port" -ForegroundColor Yellow
-            Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+        foreach ($procId in $conns) {
+            Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
         }
     } catch {}
 }
 
-Write-Host "[..] Stopping Web UI (port $WEB_PORT)..." -ForegroundColor Yellow
-Stop-ByPort $WEB_PORT
+$gwStopped = $false
+$webStopped = $false
 
-Write-Host "[..] Stopping Gateway (port $GATEWAY_PORT)..." -ForegroundColor Yellow
-Stop-ByPort $GATEWAY_PORT
+if (Test-Path $PID_FILE) {
+    try {
+        $pids = Get-Content $PID_FILE -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($pids.gateway) { $gwStopped = Stop-ByPid 'Gateway' $pids.gateway }
+        if ($pids.webui) { $webStopped = Stop-ByPid 'Web UI' $pids.webui }
+    } catch {}
+    Remove-Item $PID_FILE -Force -ErrorAction SilentlyContinue
+}
+
+if (-not $gwStopped) {
+    Write-Host "[..] Stopping Gateway by port $GATEWAY_PORT..." -ForegroundColor Yellow
+    Stop-ByPort $GATEWAY_PORT
+}
+if (-not $webStopped) {
+    Write-Host "[..] Stopping Web UI by port $WEB_PORT..." -ForegroundColor Yellow
+    Stop-ByPort $WEB_PORT
+}
 
 Start-Sleep -Seconds 2
 

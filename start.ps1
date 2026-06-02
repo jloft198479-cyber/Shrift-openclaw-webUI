@@ -5,6 +5,7 @@ $ErrorActionPreference = 'Continue'
 $WEB_PORT = 3001
 $SERVER_JS = "$PSScriptRoot\server.js"
 $CONFIG_JSON = "$PSScriptRoot\config.json"
+$PID_FILE = "$PSScriptRoot\.shrift-pid"
 
 # -- Check Node.js -------------------------------------------------
 $NODE = (Get-Command node -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source -ErrorAction SilentlyContinue)
@@ -146,6 +147,7 @@ function Test-WebUI {
 }
 
 # -- Start Gateway ------------------------------------------------
+$gwPid = $null
 $gwRunning = Test-Gateway
 if ($gwRunning) {
     Write-Host "[OK] Gateway already running on port $GATEWAY_PORT" -ForegroundColor Green
@@ -154,7 +156,8 @@ if ($gwRunning) {
     $env:OPENCLAW_STATE_DIR = $OPENCLAW_STATE_DIR
     $env:OPENCLAW_CONFIG_PATH = $OPENCLAW_CONFIG_PATH
     $gwLog = "$env:TEMP\openclaw-gateway.log"
-    Start-Process -FilePath $NODE -ArgumentList "`"$OPENCLAW_MJS`"","gateway","--port",$GATEWAY_PORT,"--verbose" -WindowStyle Hidden -RedirectStandardOutput $gwLog -RedirectStandardError "$env:TEMP\openclaw-gateway-err.log"
+    $gwProc = Start-Process -FilePath $NODE -ArgumentList "`"$OPENCLAW_MJS`"","gateway","--port",$GATEWAY_PORT,"--verbose" -WindowStyle Hidden -RedirectStandardOutput $gwLog -RedirectStandardError "$env:TEMP\openclaw-gateway-err.log" -PassThru
+    $gwPid = $gwProc.Id
 
     $waited = 0
     $maxWait = 60
@@ -175,6 +178,7 @@ if ($gwRunning) {
 }
 
 # -- Start Web UI -------------------------------------------------
+$webPid = $null
 $webRunning = Test-WebUI
 if ($webRunning) {
     Write-Host "[OK] Web UI already running on port $WEB_PORT" -ForegroundColor Green
@@ -182,7 +186,8 @@ if ($webRunning) {
     Write-Host "[..] Starting Web UI on port $WEB_PORT..." -ForegroundColor Yellow
     $env:OPENCLAW_STATE_DIR = $OPENCLAW_STATE_DIR
     $webLog = "$env:TEMP\openclaw-webui.log"
-    Start-Process -FilePath $NODE -ArgumentList "`"$SERVER_JS`"" -WindowStyle Hidden -RedirectStandardOutput $webLog -RedirectStandardError "$env:TEMP\openclaw-webui-err.log"
+    $webProc = Start-Process -FilePath $NODE -ArgumentList "`"$SERVER_JS`"" -WindowStyle Hidden -RedirectStandardOutput $webLog -RedirectStandardError "$env:TEMP\openclaw-webui-err.log" -PassThru
+    $webPid = $webProc.Id
 
     $waited = 0
     $maxWait = 15
@@ -207,6 +212,13 @@ Write-Host "  Gateway:  http://127.0.0.1:$GATEWAY_PORT" -ForegroundColor Cyan
 Write-Host "  Web UI:   http://localhost:$WEB_PORT" -ForegroundColor Cyan
 Write-Host "=====================================" -ForegroundColor Cyan
 Write-Host ""
+
+$pidData = @{}
+if ($gwPid) { $pidData['gateway'] = $gwPid }
+if ($webPid) { $pidData['webui'] = $webPid }
+if ($pidData.Count -gt 0) {
+    $pidData | ConvertTo-Json | Set-Content $PID_FILE -Encoding UTF8
+}
 
 if (-not $NoBrowser) {
     Start-Process "http://localhost:$WEB_PORT"

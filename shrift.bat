@@ -17,7 +17,6 @@ if exist "%~dp0config.json" (
         for /f "tokens=0 delims= " %%b in ("%%a") do set WEB_PORT=%%b
     )
 )
-:: Remove quotes from port
 set WEB_PORT=%WEB_PORT:"=%
 set WEB_PORT=%WEB_PORT: =%
 
@@ -28,13 +27,18 @@ if exist "%ProgramFiles%\Microsoft\Edge\Application\msedge.exe" set EDGE=%Progra
 if "%EDGE%"=="" set EDGE=msedge.exe
 
 echo [OK] Opening Shrift on port %WEB_PORT%...
-echo [..] Close the app window to stop services.
+start "" "%EDGE%" --app=http://localhost:%WEB_PORT%
+
+echo.
+echo =====================================
+echo   Shrift is running.
+echo   Close THIS window to stop services.
+echo =====================================
 echo.
 
-:: Open as PWA-style app window, WAIT until user closes it
-start /WAIT "" "%EDGE%" --app=http://localhost:%WEB_PORT%
+:: Keep the window open; when user closes it, stop services
+pause
 
-:: User closed the app, stop services
 echo [..] Stopping services...
 powershell.exe -ExecutionPolicy Bypass -File "%~dp0stop.ps1"
 echo [OK] Services stopped.
