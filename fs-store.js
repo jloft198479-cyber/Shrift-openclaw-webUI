@@ -134,7 +134,8 @@ function findAgentRaw(agentId) {
 function getAgentWorkspace(agentId) {
   const raw = findAgentRaw(agentId);
   if (!raw) return null;
-  return resolveHome(raw.workspace || '');
+  const ws = resolveHome(raw.workspace || '');
+  return ws ? path.resolve(ws) : ws;
 }
 
 function scanSkills(ws) {
