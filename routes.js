@@ -268,7 +268,7 @@ module.exports = {
       }
       const cp = require('child_process');
       if (process.platform === 'win32') {
-        cp.spawn('explorer', [dir], { shell: true, detached: true });
+        cp.spawn('explorer', [dir], { detached: true });
       } else {
         cp.spawn('open', [dir], { detached: true });
       }
