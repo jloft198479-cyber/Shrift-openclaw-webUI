@@ -18,7 +18,7 @@ const SessionInteraction = {
       const newSession = {
         id: sessionId,
         name: cleanName,
-        agent: State.currentAgent || '',
+        agent: State.currentAgent || (State.interactionMode === 'dispatch' ? 'main' : ''),
         created_at: Date.now(),
         updated_at: Date.now(),
         messages: [],
