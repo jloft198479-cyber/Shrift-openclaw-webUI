@@ -99,8 +99,9 @@ function removeDir(dirPath) {
     const items = fs.readdirSync(dirPath);
     for (let i = 0; i < items.length; i++) {
       const p = path.join(dirPath, items[i]);
-      const stat = fs.statSync(p);
-      if (stat.isDirectory()) { removeDir(p); }
+      const stat = fs.lstatSync(p);
+      if (stat.isSymbolicLink()) { fs.unlinkSync(p); }
+      else if (stat.isDirectory()) { removeDir(p); }
       else { fs.unlinkSync(p); }
     }
     fs.rmdirSync(dirPath);
@@ -174,13 +175,18 @@ function _scanDirSkills(dir, source, skills) {
 
 function scanGlobalSkills() {
   const skills = [];
+  const scanned = {}; // 去重：同一物理目录只扫描一次
   const stateDir = process.env.OPENCLAW_STATE_DIR;
   if (stateDir) {
-    _scanDirSkills(path.join(stateDir, 'skills'), 'global', skills);
+    const dir = path.join(stateDir, 'skills');
+    const resolved = path.resolve(dir);
+    if (!scanned[resolved]) { scanned[resolved] = true; _scanDirSkills(dir, 'global', skills); }
   }
   const home = process.env.USERPROFILE || process.env.HOME || '';
   if (home) {
-    _scanDirSkills(path.join(home, '.openclaw', 'skills'), 'global', skills);
+    const dir = path.join(home, '.openclaw', 'skills');
+    const resolved = path.resolve(dir);
+    if (!scanned[resolved]) { scanned[resolved] = true; _scanDirSkills(dir, 'global', skills); }
   }
   return skills;
 }
@@ -281,22 +287,7 @@ function cleanupWorkspace(workspace) {
     console.error('[FS] cleanupWorkspace blocked: path outside allowed roots:', resolved);
     return false;
   }
-  const wsSkillsDir = path.join(resolved, 'skills');
-  try {
-    if (fs.existsSync(wsSkillsDir)) {
-      fs.readdirSync(wsSkillsDir).forEach(function (name) {
-        const p = path.join(wsSkillsDir, name);
-        try {
-          const stat = fs.lstatSync(p);
-          if (stat.isSymbolicLink()) { fs.unlinkSync(p); }
-          else if (process.platform === 'win32' && stat.isDirectory()) {
-            const marker = path.join(p, '.managed-skill-link');
-            if (fs.existsSync(marker)) { fs.rmSync(p, { recursive: true, force: true }); }
-          }
-        } catch (e) {}
-      });
-    }
-  } catch (e) {}
+  // removeDir now uses lstatSync, so junctions/symlinks are unlinked (not followed)
   return removeDir(resolved);
 }
 

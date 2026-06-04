@@ -781,9 +781,11 @@ body.resizing-agent-section * {
   padding: 14px 18px;
 }
 .message.user .bubble {
-  padding: 6px 0;
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-sm);
   color: var(--text);
-  text-align: left;
+  padding: 14px 18px;
   white-space: pre-wrap;
 }
 

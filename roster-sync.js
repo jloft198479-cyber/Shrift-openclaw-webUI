@@ -34,28 +34,45 @@ function _syncSkillLinks(skillIds, workspace) {
         const stat = fs.lstatSync(p);
         if (stat.isSymbolicLink()) {
           managed[name] = p;
-        } else if (process.platform === 'win32' && stat.isDirectory()) {
-          try {
-            const marker = path.join(p, '.managed-skill-link');
-            if (fs.existsSync(marker)) managed[name] = p;
-          } catch (e) {}
+        } else if (stat.isDirectory()) {
+          // Recognize orphan copies: plain directories whose name matches a global skill.
+          // These are stale copies (not junctions) that should be replaced with links.
+          const globalCounterpart = path.join(globalSkillsDir, name);
+          if (fs.existsSync(globalCounterpart)) {
+            managed[name] = p;
+          }
         }
       } catch (e) {}
     });
   } catch (e) {}
 
   for (const name in managed) {
-    if (skillIds.indexOf(name) < 0) {
-      try { fs.rmSync(managed[name], { recursive: true, force: true }); } catch (e) {}
-      continue;
-    }
     try {
       const stat = fs.lstatSync(managed[name]);
       if (stat.isSymbolicLink()) {
         const target = fs.readlinkSync(managed[name]);
         const resolved = path.resolve(path.dirname(managed[name]), target);
         if (!fs.existsSync(resolved)) {
-          fs.unlinkSync(managed[name]);
+          // Broken link → remove
+          try { fs.unlinkSync(managed[name]); } catch (e) {}
+        } else if (skillIds.indexOf(name) < 0 && resolved.indexOf(globalSkillsDir) < 0) {
+          // Not in skillIds AND not pointing to global skills → remove
+          try { fs.rmSync(managed[name], { recursive: true, force: true }); } catch (e) {}
+        }
+        // Otherwise: valid link (in skillIds or pointing to global skills) → keep
+      } else if (stat.isDirectory()) {
+        // Orphan copy matching a global skill → always replace with junction
+        // (regardless of skillIds, so even agents without explicit skills get corrected)
+        const globalSrc = path.join(globalSkillsDir, name);
+        try { fs.rmSync(managed[name], { recursive: true, force: true }); } catch (e) {}
+        try {
+          if (process.platform === 'win32') {
+            fs.symlinkSync(globalSrc, managed[name], 'junction');
+          } else {
+            fs.symlinkSync(globalSrc, managed[name], 'dir');
+          }
+        } catch (e) {
+          console.error('[Roster] Failed to replace orphan copy with junction for "' + name + '": ' + e.message);
         }
       }
     } catch (e) {}
@@ -88,14 +105,32 @@ function _validateAllowAgents(agentList) {
     validIds.add(agentList[i].id);
   }
   let changed = false;
+  // 清理无效引用和自引用
   for (let i = 0; i < agentList.length; i++) {
     const sub = agentList[i].subagents;
     if (!sub || !Array.isArray(sub.allowAgents)) continue;
     const before = sub.allowAgents.length;
-    sub.allowAgents = sub.allowAgents.filter(function (id) { return validIds.has(id); });
+    sub.allowAgents = sub.allowAgents.filter(function (id) {
+      return validIds.has(id) && id !== agentList[i].id; // 过滤自引用
+    });
     if (sub.allowAgents.length !== before) {
-      console.warn('[Roster] Cleaned ' + (before - sub.allowAgents.length) + ' dangling allowAgents ref(s) from agent ' + agentList[i].id);
+      console.warn('[Roster] Cleaned ' + (before - sub.allowAgents.length) + ' dangling/self-ref allowAgents ref(s) from agent ' + agentList[i].id);
       changed = true;
+    }
+  }
+  // 自动补全：main/default agent 的 allowAgents 应包含所有其他 agent
+  for (let i = 0; i < agentList.length; i++) {
+    const a = agentList[i];
+    if (a.id !== 'main' && !a.default) continue;
+    if (!a.subagents) a.subagents = {};
+    if (!a.subagents.allowAgents) a.subagents.allowAgents = [];
+    for (let j = 0; j < agentList.length; j++) {
+      if (agentList[j].id === a.id) continue; // 不加自己
+      if (a.subagents.allowAgents.indexOf(agentList[j].id) < 0) {
+        a.subagents.allowAgents.push(agentList[j].id);
+        console.log('[Roster] Auto-added agent "' + agentList[j].id + '" to allowAgents of "' + a.id + '"');
+        changed = true;
+      }
     }
   }
   return changed;
@@ -104,11 +139,13 @@ function _validateAllowAgents(agentList) {
 const _SYS_SECTION_START = '<!-- system-sync-start -->';
 const _SYS_SECTION_END = '<!-- system-sync-end -->';
 
-function _buildTeamSection(agentId, agentList) {
+function _buildTeamSection(agentId, agentList, allowedIds) {
   const lines = ['## 团队成员', ''];
   for (let i = 0; i < agentList.length; i++) {
     const a = agentList[i];
     if (a.id === agentId) continue;
+    // 如果有 allowAgents 列表，只展示被允许的成员
+    if (allowedIds && allowedIds.indexOf(a.id) < 0) continue;
     let name = a.name || a.id;
     let desc = a.description || (a.identity && a.identity.description) || '';
     if (desc.indexOf(name + ' — ') === 0) desc = desc.slice(name.length + 3);
@@ -165,7 +202,10 @@ function _buildSkillSection(skillIds) {
 
 function _buildSystemSection(agentId, agentList, skillIds) {
   const parts = [];
-  const teamSection = _buildTeamSection(agentId, agentList);
+  // 只展示 allowAgents 中的成员，与 Gateway spawn 权限保持一致
+  const target = agentList.find(function (a) { return a.id === agentId; });
+  const allowedIds = (target && target.subagents && target.subagents.allowAgents) ? target.subagents.allowAgents : null;
+  const teamSection = _buildTeamSection(agentId, agentList, allowedIds);
   if (teamSection) parts.push(teamSection);
   const skillSection = _buildSkillSection(skillIds);
   if (skillSection) parts.push(skillSection);

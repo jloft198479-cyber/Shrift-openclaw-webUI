@@ -107,6 +107,7 @@ function _extractTeamFromToolsMd(md) {
 
 function _ensureInAllowAgents(agentList, agentId) {
   for (let i = 0; i < agentList.length; i++) {
+    if (agentList[i].id === agentId) continue; // 不允许自引用
     if ((agentList[i].id === 'main' || agentList[i].default) && agentList[i].subagents) {
       if (!agentList[i].subagents.allowAgents) agentList[i].subagents.allowAgents = [];
       if (agentList[i].subagents.allowAgents.indexOf(agentId) < 0) {
@@ -225,7 +226,6 @@ function updateAgent(agentId, body, res) {
     }
   }
   if (!found) { _jsonErr(res, 404, 'Agent not found'); return; }
-  _ensureInAllowAgents(agentList, agentId);
   if (_saveAgentList(data, agentList)) {
     invalidateCache();
     _jsonOk(res);
