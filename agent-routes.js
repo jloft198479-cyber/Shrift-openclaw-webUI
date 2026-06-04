@@ -127,6 +127,9 @@ function _removeFromAllowAgents(agentList, agentId) {
 }
 
 function _saveAgentList(data, agentList) {
+  if (!data.agents) data.agents = {};
+  if (!data.agents.defaults) data.agents.defaults = {};
+  if (!data.agents.defaults.contextInjection) data.agents.defaults.contextInjection = 'always';
   if (data.agents && data.agents.list) data.agents.list = agentList;
   else data.agents = agentList;
   return store.writeConfig(data);
