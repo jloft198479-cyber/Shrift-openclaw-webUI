@@ -31,7 +31,7 @@ const TEXT_EXTS = {
 };
 
 const UPLOAD_ALLOWED_EXT = Object.assign({
-  '.png': 1, '.jpg': 1, '.jpeg': 1, '.gif': 1, '.svg': 1, '.webp': 1,
+  '.png': 1, '.jpg': 1, '.jpeg': 1, '.gif': 1, '.webp': 1,
   '.pdf': 1, '.txt': 1, '.md': 1, '.json': 1, '.csv': 1,
   '.zip': 1, '.tar': 1, '.gz': 1,
   '.doc': 1, '.docx': 1, '.xls': 1, '.xlsx': 1, '.ppt': 1, '.pptx': 1,
@@ -101,6 +101,11 @@ module.exports = {
             return;
           }
           const commaIdx = b.data.indexOf(',');
+          if (commaIdx < 0) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Invalid file data' }));
+            return;
+          }
           const base64 = b.data.slice(commaIdx + 1);
           const buf = Buffer.from(base64, 'base64');
           const fileName = Date.now() + '-' + Math.random().toString(36).slice(2, 8) + ext;
@@ -268,7 +273,7 @@ module.exports = {
       }
       const cp = require('child_process');
       if (process.platform === 'win32') {
-        cp.spawn('explorer', [dir], { detached: true });
+        cp.spawn('explorer', [dir], { shell: true, detached: true });
       } else {
         cp.spawn('open', [dir], { detached: true });
       }

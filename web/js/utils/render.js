@@ -34,11 +34,12 @@ const _mdCache = new Map();
 const _mdCacheMax = Constants.LIMIT.MD_CACHE_MAX;
 
 /**
- * 渲染 Markdown 文本为 HTML
+ * 渲染 Markdown 为 HTML
  * @param {string} text - Markdown 文本
+ * @param {boolean} [streaming=false] - 是否处于流式渲染中（流式期间不写缓存）
  * @returns {string} HTML 字符串
  */
-function renderMarkdown(text) {
+function renderMarkdown(text, streaming) {
   if (!text) return '';
   const cached = _mdCache.get(text);
   if (cached) return cached;
@@ -56,10 +57,13 @@ function renderMarkdown(text) {
   } else {
     html = Utils.escapeHtml(text).replace(/\n/g, '<br>');
   }
-  _mdCache.set(text, html);
-  if (_mdCache.size > _mdCacheMax) {
-    const first = _mdCache.keys().next().value;
-    _mdCache.delete(first);
+  // 流式期间不写缓存：中间结果永远不会命中，写缓存浪费内存和 CPU
+  if (!streaming) {
+    _mdCache.set(text, html);
+    if (_mdCache.size > _mdCacheMax) {
+      const first = _mdCache.keys().next().value;
+      _mdCache.delete(first);
+    }
   }
   return html;
 }

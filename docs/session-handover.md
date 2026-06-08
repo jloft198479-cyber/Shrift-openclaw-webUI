@@ -38,7 +38,32 @@ cd F:\fzz-Project\openclaw-web-ui\; node server.js
 
 ## 三、本轮完成的工作
 
-### 3.1 功能（上一轮已完成）
+### 3.1 CSS 变量化补完 — 消除 16 处 rgba 硬编码
+
+| 变量 | 替换处数 | 涉及选择器 |
+|------|---------|-----------|
+| `var(--hover-bg)` → `rgba(0,0,0,0.05)` | 6 处 | `#sidebar-collapse-btn:hover`, `.filter-btn:hover`, `.session-item:hover/active`, `.icon-btn:hover`, `.agent-item.active` |
+| `var(--surface-hover)` → `rgba(0,0,0,0.04)` | 6 处 | `#new-chat-btn:hover`, `.badge`, `.dropdown-item:hover`, `.new-agent-btn`, `.agent-item:hover`, `.agent-icon` |
+| `var(--border-subtle)` → `border-top: var(--border-light)` | 4 处 | `#agent-section`, `#input-area`, `.model-bar`, `.question-section` |
+| 阴影类 `rgba(0,0,0,0.04)` | 3 处保持硬编码 | `--shadow-lg`, `#sidebar box-shadow`, `.session-item.active box-shadow`（阴影语义不同） |
+
+**效果**：以后调整色调只需改 1 处变量定义，所有引用自动生效。
+
+### 3.2 `_buildMessageElement` 函数拆分
+
+`_buildMessageElement` 从 ~105 行拆分为以下结构：
+
+| 新函数 | 职责 | 行数 |
+|--------|------|:----:|
+| `_resolveMessageAgent(role, agentId)` | Agent ID→Agent 对象→显示名解析 | ~9 行 |
+| `_buildAgentLabel(bubble, agent, name)` | 标签 DOM 构建 | ~6 行 |
+| `_buildUserContent(bubble, content, meta)` | 用户消息内容（附件 3 分支） | ~39 行 |
+| `_buildAssistantContent(bubble, content, thinking, streaming)` | 助理消息（流式/思考块/内容） | ~24 行 |
+| `_buildMessageElement`（简化后） | 编排器：组装各子函数产出 | ~34 行 |
+
+**行为验证**：HTTP 200，浏览器页面加载无错误。
+
+### 3.3 功能（上一轮已完成）
 
 | 功能 | commit |
 |------|--------|
@@ -138,10 +163,10 @@ F:\fzz-Project\openclaw-web-ui\
 
 | 问题 | 位置 | 难度 |
 |------|------|:----:|
-| `rgba(0,0,0,0.05)` 背景色重复 7 处 | style.css | 低 |
-| `rgba(0,0,0,0.04)` 背景色重复 7 处 | style.css | 低 |
-| `var(--border-light)` 在 border-top 使用 4 处 | style.css | 低 |
-| `_buildMessageElement` 仍可进一步拆分 | message-renderer.js | 中 |
+| ~~`rgba(0,0,0,0.05)` 硬编码 6 处 → `var(--hover-bg)`~~ | style.css | ✅ 已修复 |
+| ~~`rgba(0,0,0,0.04)` 表面背景 6 处 → `var(--surface-hover)`~~ | style.css | ✅ 已修复 |
+| ~~`border-top: var(--border-light)` 4 处 → `var(--border-subtle)`~~ | style.css | ✅ 已修复 |
+| ~~`_buildMessageElement` 仍可进一步拆分~~ | message-renderer.js | ✅ 已修复（拆为4子函数） |
 | 事件委托硬绑定 `.messages-inner` DOM 选择器 | message-renderer.js | 中 |
 
 ### 5.3 用户反复强调的原则

@@ -8,7 +8,6 @@ function buildApp() {
     + '    <div class="logo"><img src="' + LOGO_SRC + '" alt=""></div>'
     + '    <h1>' + APP_NAME + '</h1>'
     + '    <button class="header-icon-btn" id="open-folder-btn" title="打开根目录">📁</button>'
-    + '    <button class="restart-btn" id="restart-server-btn" title="重启服务"><span class="restart-icon">↻</span></button>'
     + '  </div>'
     + '  <button id="new-chat-btn"><span class="new-chat-icon">+</span> 新建会话</button>'
     + '  <div id="filter-bar">'

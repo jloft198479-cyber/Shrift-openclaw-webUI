@@ -94,7 +94,7 @@ const WsBridge = {
         const data = JSON.parse(e.data);
         DebugTrace.log('ws-bridge-announce-result', { agentId: data.agentId || '', sessionId: data.sessionId || '', msgCount: data.messages ? data.messages.length : 0 });
         if (data.messages && data.messages.length > 0 && typeof ChatController !== 'undefined' && ChatController.handleAnnounceResult) {
-          ChatController.handleAnnounceResult(data.messages, data.agentId || '', data.sessionId || '');
+          ChatController.handleAnnounceResult(data.messages, data.agentId || '', data.sessionId || '', data.offset || 0);
         }
       } catch (err) { console.error('[WsBridge] announce-result error:', err); }
     });

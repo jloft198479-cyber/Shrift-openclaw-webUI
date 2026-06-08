@@ -25,6 +25,7 @@ try {
 }
 
 const PORT = process.env.PORT || config.port || 3001;
+const HOST = process.env.HOST || config.host || '127.0.0.1';
 const GATEWAY_URL = config.gatewayUrl || 'http://127.0.0.1:18789';
 const GATEWAY_TOKEN = config.gatewayToken || 'hermes-local-dev';
 
@@ -377,8 +378,9 @@ const server = http.createServer(function (req, res) {
 });
 
 server.timeout = 180000;
-server.listen(PORT, function () {
-  console.log('[OpenClaw Web UI] Server running at http://localhost:' + PORT);
+server.listen(PORT, HOST, function () {
+  const displayHost = HOST === '127.0.0.1' ? 'localhost' : HOST;
+  console.log('[OpenClaw Web UI] Server running at http://' + displayHost + ':' + PORT);
   console.log('[OpenClaw Web UI] Gateway: ' + GATEWAY_URL);
   console.log('[OpenClaw Web UI] SSE events: /api/events');
   console.log('[OpenClaw Web UI] Press Ctrl+C to stop');

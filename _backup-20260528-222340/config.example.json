@@ -1,6 +1,0 @@
-{
-  "port": 3001,
-  "gatewayUrl": "http://127.0.0.1:18789",
-  "gatewayToken": "hermes-local-dev",
-  "openclawConfigPath": ""
-}

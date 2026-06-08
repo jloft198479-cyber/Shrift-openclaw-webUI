@@ -359,26 +359,6 @@ body.resizing-agent-section * {
 .header-icon-btn:active {
   transform: scale(0.9);
 }
-.restart-btn {
-  opacity: 0.5;
-  background: none; border: none;
-  font-size: 14px; color: var(--meta);
-  width: 22px; height: 22px;
-  border-radius: 4px;
-  display: flex; align-items: center; justify-content: center;
-  cursor: pointer;
-  transition: opacity 150ms ease, color 150ms ease, background 150ms ease;
-  flex-shrink: 0;
-}
-.sidebar-header:hover .restart-btn { opacity: 1; }
-.restart-btn:hover {
-  opacity: 1;
-  color: var(--text);
-  background: rgba(0,0,0,0.06);
-}
-.restart-btn:active {
-  transform: scale(0.9);
-}
 
 #new-chat-btn {
   margin: 8px 12px 10px;

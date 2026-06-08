@@ -319,6 +319,13 @@ var AgentModal = {
       + '            <input type="text" id="agent-desc" value="' + escapeHtml(data.description) + '" placeholder="一句话介绍" maxlength="40">'
       + '          </div>'
       + '        </div>'
+      + (isEdit ? '' : ''
+      + '        <div class="form-row" style="margin-top:8px;">'
+      + '          <div class="form-field">'
+      + '            <label>ID <span class="section-hint">英文标识，创建后不可修改</span></label>'
+      + '            <input type="text" id="agent-id" value="' + escapeHtml(data.id || '') + '" placeholder="如 mimeng、ppt-wang" maxlength="30" spellcheck="false">'
+      + '          </div>'
+      + '        </div>')
       + '      </div>'
       + '      <div class="form-divider"></div>'
       + '      <div class="form-section">'
@@ -370,6 +377,26 @@ var AgentModal = {
     overlay.querySelectorAll('.md-editor').forEach(function(el) {
       self._initEditor(el);
     });
+
+    // 名称变化时自动建议 ID（仅创建模式）
+    if (!isEdit) {
+      var nameInput = overlay.querySelector('#agent-name');
+      var idInput = overlay.querySelector('#agent-id');
+      if (nameInput && idInput) {
+        nameInput.addEventListener('input', function() {
+          var suggested = nameInput.value.toLowerCase()
+            .replace(/[^a-z0-9_-]/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '');
+          if (!idInput.dataset.userEdited) {
+            idInput.value = suggested;
+          }
+        });
+        idInput.addEventListener('input', function() {
+          idInput.dataset.userEdited = 'true';
+        });
+      }
+    }
 
     overlay.addEventListener('click', function(e) {
       if (e.target === overlay) {
@@ -479,6 +506,14 @@ var AgentModal = {
       avatar: selectedAvatar,
       skills: [],
     };
+
+    var idInput = document.getElementById('agent-id');
+    if (idInput && idInput.value.trim()) {
+      data.id = idInput.value.trim().toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+    }
 
     var selectedSkillNodes = document.querySelectorAll('.skill-option.selected');
     selectedSkillNodes.forEach(function(el) { data.skills.push(el.dataset.skill); });

@@ -68,7 +68,6 @@ function _buildAvatarEl(role, agent) {
   return { el: avatar, color: null };
 }
 
-const _ATTACHMENT_RE = /^[\u{1F5BC}\u{1F4C4}\u{1F4E6}\u{1F4DD}\u{1F4CA}\u{1F4C3}\u{1F4CE}]\s+(.+)$/u;
 function _parseAttachments(content) {
   if (!content) return { text: '', attachments: [] };
   const lines = content.split('\n');
@@ -77,7 +76,7 @@ function _parseAttachments(content) {
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    const match = line.match(_ATTACHMENT_RE);
+    const match = line.match(Constants.REGEX.ATTACHMENT_LINE);
     if (match) {
       const fileName = match[1].trim();
       const isImage = line.indexOf('🖼') === 0;

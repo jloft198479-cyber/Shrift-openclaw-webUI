@@ -140,7 +140,12 @@ const _GENERIC_IDS = { agent: 1, bot: 1, ai: 1, assistant: 1, helper: 1 };
 
 function createAgent(body, res) {
   if (!body || !body.name) { _jsonErr(res, 400, 'Name is required'); return; }
-  let id = body.id || body.name.toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  let id = body.id || '';
+  if (!id) {
+    id = body.name.toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  } else {
+    id = id.toLowerCase().replace(/[^a-z0-9_-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  }
   if (!id || id.length <= 2 || _GENERIC_IDS[id]) {
     id = (id || 'agent') + '-' + _genId();
   }

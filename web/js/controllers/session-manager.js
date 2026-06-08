@@ -50,7 +50,7 @@ const SessionStore = {
       if (key && key.indexOf('openclaw_session_') === 0) {
         try {
           const data = JSON.parse(localStorage.getItem(key));
-          keys.push({ key: key, updatedAt: data.updatedAt || 0 });
+          keys.push({ key: key, updatedAt: data.updated_at || data.updatedAt || 0 });
         } catch (e) {
           keys.push({ key: key, updatedAt: 0 });
         }

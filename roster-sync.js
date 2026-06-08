@@ -250,6 +250,58 @@ function _syncToolsMd(agentId, agentList, skillIds, workspace) {
   store.writeFile(toolsPath, content);
 }
 
+function _syncIdentityMd(agentId, agentList, workspace) {
+  var target = null;
+  for (var i = 0; i < agentList.length; i++) {
+    if (agentList[i].id === agentId) { target = agentList[i]; break; }
+  }
+  if (!target) return;
+
+  var name = target.name || target.id;
+  var emoji = (target.identity && target.identity.emoji) || '';
+  var desc = target.description || (target.identity && target.identity.description) || '';
+
+  var lines = [
+    '# IDENTITY.md',
+    '',
+    '- **Name:** ' + name,
+    '- **Creature:** AI Agent',
+    '- **Vibe:** ' + (desc || '直接执行，高效务实'),
+    '- **Emoji:** ' + emoji,
+    '- **Avatar:**',
+    ''
+  ];
+
+  var identityPath = path.join(workspace, 'IDENTITY.md');
+  store.writeFile(identityPath, lines.join('\n'));
+}
+
+function _syncBootstrapMd(agentId, agentList, workspace) {
+  var target = null;
+  for (var i = 0; i < agentList.length; i++) {
+    if (agentList[i].id === agentId) { target = agentList[i]; break; }
+  }
+  if (!target) return;
+
+  var name = target.name || target.id;
+
+  var lines = [
+    '# 身份确认',
+    '',
+    '你的身份已在 AGENTS.md 中明确定义，无需通过对话探索。',
+    '',
+    '- 你的名字、性格、行为规则 → 见 AGENTS.md',
+    '- 你的团队成员和技能 → 见 TOOLS.md',
+    '- 用户信息 → 在交互中自然积累，更新 USER.md',
+    '',
+    '直接按 AGENTS.md 的设定开始工作，不要反问用户"你是谁"。',
+    ''
+  ];
+
+  var bootstrapPath = path.join(workspace, 'BOOTSTRAP.md');
+  store.writeFile(bootstrapPath, lines.join('\n'));
+}
+
 function _cleanAgentsMd(workspace) {
   const agentsPath = path.join(workspace, 'AGENTS.md');
   const existing = store.readFile(agentsPath) || '';
@@ -283,6 +335,8 @@ function syncSubAgentRoster(agentId, agentList) {
 
   _syncSkillLinks(target.skills || [], workspace);
   _syncToolsMd(agentId, agentList, target.skills || [], workspace);
+  _syncIdentityMd(agentId, agentList, workspace);
+  _syncBootstrapMd(agentId, agentList, workspace);
   _cleanAgentsMd(workspace);
   return true;
 }

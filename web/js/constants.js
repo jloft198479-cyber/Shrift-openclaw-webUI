@@ -130,6 +130,15 @@ const Constants = {
     DAY: 86400000,
   },
 
+  // ═══ 正则表达式 ═══
+
+  REGEX: {
+    /** 附件行匹配：emoji 前缀 + 空格 + 文件名（用于提取附件信息） */
+    ATTACHMENT_LINE: /^[\u{1F5BC}\u{1F4C4}\u{1F4E6}\u{1F4DD}\u{1F4CA}\u{1F4C3}\u{1F4CE}]\s+(.+)$/u,
+    /** 附件行检测：仅判断是否为附件行（不捕获） */
+    ATTACHMENT_LINE_TEST: /^[\u{1F5BC}\u{1F4C4}\u{1F4E6}\u{1F4DD}\u{1F4CA}\u{1F4C3}\u{1F4CE}]\s/u,
+  },
+
   // ═══ 分页/步长 ═══
 
   PAGINATION: {

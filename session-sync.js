@@ -20,12 +20,14 @@
 
 const fs = require('fs');
 const path = require('path');
+const store = require('./fs-store');
 const debugTrace = require('./debug-trace');
 
 let _broadcastSSE = null;
 let _fileOffsets = {};
 let _retryTimer = null;
 let _retryCount = 0;
+let _pendingSessionKey = '';
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 1000;
 const INITIAL_DELAY_MS = 500;
@@ -40,6 +42,26 @@ function init(broadcastFn) {
 }
 
 let _lastAgentId = '';
+
+/**
+ * 从 sessionKey 中提取 agent ID
+ * 格式: agent:<agentId>:subagent:<subAgentId>:webui:<sessionId>
+ * 或: agent:<agentId>:webui:<sessionId>
+ * 返回第一个非 main 的 agentId（优先子 agent）
+ */
+function _extractAgentIdFromKey(sessionKey) {
+  if (!sessionKey) return '';
+  const parts = sessionKey.split(':');
+  // agent:<agentId>:subagent:<subAgentId>:webui:<sessionId>
+  if (parts.length >= 4 && parts[0] === 'agent' && parts[2] === 'subagent') {
+    return parts[3] !== 'main' ? parts[3] : '';
+  }
+  // agent:<agentId>:webui:<sessionId>
+  if (parts.length >= 2 && parts[0] === 'agent') {
+    return parts[1] !== 'main' ? parts[1] : '';
+  }
+  return '';
+}
 
 function _extractFrontendSessionId(sessionKey) {
   if (!sessionKey || sessionKey.indexOf(':webui:') < 0) return '';
@@ -77,11 +99,16 @@ function onSubagentGatewayEvent(data) {
 }
 
 function _scheduleRead(sessionKey, frontendSessionId) {
-  if (_retryTimer) return;
+  if (_retryTimer) {
+    // 已有 retry 在进行，更新待处理的 sessionKey 而非丢弃
+    _pendingSessionKey = sessionKey;
+    return;
+  }
   _retryCount = 0;
+  _pendingSessionKey = sessionKey;
   _retryTimer = setTimeout(function () {
     _retryTimer = null;
-    _doRead(sessionKey, frontendSessionId);
+    _doRead(_pendingSessionKey, frontendSessionId);
   }, INITIAL_DELAY_MS);
 }
 
@@ -97,10 +124,18 @@ function _doRead(sessionKey, frontendSessionId) {
   }
 
   let newMessages = [];
+  let readOffset = 0;
   try {
     const stat = fs.statSync(targetFile);
     const currentOffset = _fileOffsets[targetFile] || 0;
-    if (stat.size <= currentOffset) {
+    readOffset = currentOffset; // 记录本次读取的起始偏移量，用于前端去重
+    // 文件被截断/替换时，重置偏移量从头读取
+    if (currentOffset > 0 && stat.size < currentOffset) {
+      _log('fileTruncated', targetFile + ' was ' + currentOffset + ' now ' + stat.size + ', resetting offset');
+      _fileOffsets[targetFile] = 0;
+      readOffset = 0;
+    }
+    if (stat.size <= (readOffset || 0)) {
       _maybeRetry(sessionKey, frontendSessionId);
       return;
     }
@@ -118,13 +153,23 @@ function _doRead(sessionKey, frontendSessionId) {
   } catch (e) { _logError('read', e); }
 
   if (newMessages.length > 0) {
-    // Fix 4: main session 的 announce 不应带子 agent 标签
-    if (sessionKey && sessionKey.indexOf(':webui:') >= 0) _lastAgentId = '';
-    debugTrace.trace('announce-result-broadcast', { agentId: _lastAgentId, sessionId: frontendSessionId, msgCount: newMessages.length, lastMsgPreview: (newMessages[newMessages.length - 1].content || '').substring(0, 100) });
-    if (_broadcastSSE) {
-      _broadcastSSE({ type: 'announce-result', messages: newMessages, agentId: _lastAgentId, sessionId: frontendSessionId });
+    // 从消息中提取 agentId（每条消息自带，不再依赖全局变量）
+    // 如果消息有 agentId，用最后一条的；否则回退到 _lastAgentId（兼容旧逻辑）
+    let broadcastAgentId = '';
+    for (let mi = newMessages.length - 1; mi >= 0; mi--) {
+      if (newMessages[mi].agentId) {
+        broadcastAgentId = newMessages[mi].agentId;
+        break;
+      }
     }
-    _lastAgentId = '';
+    // main session 的 announce 不应带子 agent 标签
+    if (sessionKey && sessionKey.indexOf(':webui:') >= 0 && sessionKey.indexOf(':subagent:') < 0) {
+      broadcastAgentId = '';
+    }
+    debugTrace.trace('announce-result-broadcast', { agentId: broadcastAgentId, sessionId: frontendSessionId, msgCount: newMessages.length, lastMsgPreview: (newMessages[newMessages.length - 1].content || '').substring(0, 100) });
+    if (_broadcastSSE) {
+      _broadcastSSE({ type: 'announce-result', messages: newMessages, agentId: broadcastAgentId, sessionId: frontendSessionId, offset: readOffset });
+    }
   } else {
     _maybeRetry(sessionKey, frontendSessionId);
   }
@@ -184,9 +229,14 @@ function _isHeartbeatSession(filePath) {
   finally { if (fd !== null) { try { fs.closeSync(fd); } catch (e) {} } }
 }
 
+function _resolveStateDir() {
+  if (process.env.OPENCLAW_STATE_DIR) return process.env.OPENCLAW_STATE_DIR;
+  return store.getDataDir ? store.getDataDir() : '';
+}
+
 function _findTargetFile(sessionKey) {
   try {
-    const stateDir = process.env.OPENCLAW_STATE_DIR;
+    const stateDir = _resolveStateDir();
     if (!stateDir) return null;
     const sessionsDir = path.join(stateDir, MAIN_AGENT_SESSIONS_SUBDIR);
     if (!fs.existsSync(sessionsDir)) return null;
@@ -237,7 +287,9 @@ function _parseAssistantMessages(raw) {
           text = content;
         }
         if (text && text !== 'HEARTBEAT_OK') {
-          result.messages.push({ role: 'assistant', content: text, agentId: '' });
+          // 从 JSONL 行的 sessionKey 中提取 agentId，每条消息自带正确的归属
+          const agentId = _extractAgentIdFromKey(item.sessionKey || '');
+          result.messages.push({ role: 'assistant', content: text, agentId: agentId });
         }
       }
     } catch (e) { _logError('parseLine', e); }

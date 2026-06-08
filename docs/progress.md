@@ -1,504 +1,150 @@
-# OpenClaw Web UI 助理 — 项目完整进度文档
+# OpenClaw Web UI 助理 — 项目进度文档
 
-> 本文档是项目上下文的唯一来源。任何新会话的 AI 助手必须先完整阅读本文档再开始工作。
+> **最新状态（2026-06-01）**：v0.5.0 已提交至 GitHub。主 Agent/Skills/TOOLS.md 关系已梳理完毕，编辑弹窗已重构，所有改动已验证通过。
 >
-> **新会话快速入口**：先读 `docs/session-handover.md` 了解当前快照，再回来看本文档深度上下文。
->
-> **最新状态（2026-05-31）**：代码质量重构已完成（CSS变量化+JS函数抽取+工具链），调度全链路验证通过。
-> 最新 commit `7dd8fbc`，分支 `ui-optimize-claude-style`。
+> **新会话快速入口**：先读 `_handoff-next-session.md` 了解当前快照，再回来看本文档深度上下文。
 
 ---
 
-## 一、产品定义
+## 一、产品定位
 
 ### 产品名称
-OpenClaw Web UI 助理
+Shrift（虾指挥）— OpenClaw Web UI
 
 ### 核心定位
-主从架构多 Agent 对话平台。用户通过主助理进行日常对话，遇到特定领域问题时通过 `@助手名` 召唤专属子 Agent，获得独立、专业的响应或行动。
+主从架构多 Agent 对话平台。两个核心模式：
+1. **私聊模式**：`model = openclaw/agentId`，直接和指定 Agent 对话
+2. **智能调度**：`model = openclaw/main` + `sessions_spawn` + announce，自动分配任务
 
-### 用户第一性原理
-用户希望获得一种**独立的体验**——日常问题由主 Agent 处理；遇到特殊难题时，需要一个专属专家，能提供专业指导，甚至直接行动（写文件、修 bug、写代码、撰文、发布内容）。
-
-### 核心设计原则（用户反复强调，不可违反）
-1. **先讨论再动手**——不要上来就改代码，先说清楚原因和方案
-2. **从用户角度思考体验**——第一性原理
-3. **不要写死代码**——保持灵活性
-4. **组件化原子化**——可复用、可组合
-5. **路由不应该是 LLM 的自由意志**——应该是明确的、可复现的决策点
-6. **稳定第一**——不稳定的产品没有意义
+### 架构原则
+- 零框架，纯原生 JS，15 个文件，启动即用
+- 单向数据流：`State.setState()` → 事件通知 → 组件响应
+- 真理源自一处：config.json 是唯一数据源
 
 ---
 
-## 二、技术路线决策
+## 二、技术栈
 
-### 已放弃：Hermes 框架
-
-**放弃原因**：
-1. **稳定性不可控**：Hermes Gateway（8648端口）频繁拒绝连接，根因是 Hermes 自身 skills_sync.py 的原子写入机制在进程异常退出时残留 .tmp 文件，导致 Gateway 启动卡死。这不是我们的代码导致的，我们无法修复。
-2. **架构天花板**：API 模式下子 Agent 只是换 instructions（角色切换），不是独立实例。toolsets 不可自定义，所有请求使用全量工具集。每次 @子Agent 都是全新对话，无跨会话记忆。
-3. **黑盒依赖**：核心逻辑依赖 Hermes API Server，没有控制权，出了问题只能手动删文件、重启。
-
-### 当前选择：OpenClaw
-
-**选择原因**：
-1. **SubAgent 机制**：独立工作区 + 独立 SOUL.md + 独立工具策略 + 独立记忆，从架构层面保证子 Agent 独立性
-2. **Skills 系统**：每 Agent 独立 Skills 目录，三层加载（内置→托管→工作区），门控机制
-3. **记忆系统**：每 Agent 独立 memory/ + 向量搜索 + 自动记忆刷新
-4. **显式主从调用**：sessions_spawn 是程序化调用，不是 LLM 自由意志
-5. **稳定性**：有 openclaw doctor 诊断、严格配置验证、模型故障转移、健康检查
-6. **国产模型支持**：DeepSeek/Qwen/GLM 等原生支持
-7. **HTTP/WebSocket API**：可对接自定义 Web UI
-
-### 调研参考链接
-- OpenClaw 官网：https://openclawlab.com/zh-cn/docs/
-- OpenClaw GitHub：https://github.com/openclaw/openclaw
-- SubAgent 文档：https://openclawlab.com/zh-cn/docs/tools/subagents/
-- 多 Agent 路由：https://openclawlab.com/zh-cn/docs/concepts/multi-agent/
-- Skills 系统：https://openclawlab.com/zh-cn/docs/tools/skills/
-- 记忆系统：https://openclawlab.com/zh-cn/docs/concepts/memory/
-- HTTP API：https://openclawlab.com/zh-cn/docs/reference/http-api/
-- OpenAI 兼容接口：https://openclawlab.com/zh-cn/docs/gateway/openai-http-api/
-- Gateway 协议：https://openclawlab.com/zh-cn/docs/gateway/protocol/
-- 国产模型接入：https://openclawlab.com/zh-cn/docs/providers/china/
-- 多 Agent 沙箱与工具：https://openclawlab.com/zh-cn/docs/tools/multi-agent-sandbox-tools/
-- Agent 运行时：https://openclawlab.com/zh-cn/docs/concepts/agent/
-- Agent 循环：https://openclawlab.com/zh-cn/docs/concepts/agent-loop/
-- 会话工具：https://openclawlab.com/zh-cn/docs/concepts/session-tool/
-- 配置参考：https://openclawlab.com/zh-cn/docs/gateway/configuration/
-- Windows 安装：https://openclawlab.com/zh-cn/docs/platforms/windows/
-- WebChat：https://openclawlab.com/zh-cn/docs/web/webchat/
+| 组件 | 技术 |
+|------|------|
+| 后端 | Node.js（原生 http，无框架） |
+| 前端 | 原生 JS（无 React/Vue），零打包链 |
+| Markdown 渲染 | marked.js |
+| Markdown 编辑 | contenteditable + marked + turndown.js |
+| 样式 | 原生 CSS，CSS 变量化 |
 
 ---
 
-## 三、当前环境
-
-### 已安装软件
-
-| 软件 | 版本 | 位置 |
-|------|------|------|
-| Node.js | v24.16.0 | D:\nodejs\ |
-| npm | 11.13.0 | D:\nodejs\ |
-| Claude Code | 最新 | D:\nodejs\npm-global\ |
-| OpenClaw | 2026.5.19 | D:\nodejs\npm-global\ |
-
-### OpenClaw 配置
-
-| 项目 | 值 |
-|------|------|
-| 配置文件 | D:\AppData\openclaw\openclaw.json |
-| 数据目录 | D:\AppData\openclaw\（通过 OPENCLAW_STATE_DIR 环境变量） |
-| npm 缓存 | D:\AppData\npm-cache\ |
-| Gateway 端口 | 18789 |
-| Gateway 认证 | token 模式，token = hermes-local-dev |
-| 默认模型 | deepseek/deepseek-chat |
-| DeepSeek API Key | sk-8015c8cbaf22479ab3bdc3c75a4a8d50 |
-| HTTP API | 已启用（chatCompletions） |
-| WebSocket | 已启用，protocol v4 |
-| 控制台安全 | allowInsecureAuth + dangerouslyDisableDeviceAuth（开发阶段） |
-| 允许来源 | allowedOrigins: ["*"]（开发阶段） |
-
-### 已配置的 Agent
-
-| Agent ID | 名称 | 工作区 | 头像 | 可 spawn 子 Agent |
-|----------|------|--------|------|-------------------|
-| main | 虾指挥 | ~/.openclaw/workspace | /logo.svg | jobs, mrbeast, ppt 等 |
-| jobs | 乔布斯 | ~/.openclaw/workspace-jobs | avatars/male-james.svg | — |
-| mrbeast | MrBeast | ~/.openclaw/workspace-mrbeast | avatars/male-michael.svg | — |
-| ppt | 小王 | ~/.openclaw/workspace-ppt | avatars/male-james.svg | — |
-
-### 环境变量（已设置，用户级永久）
-
-| 变量 | 值 |
-|------|------|
-| OPENCLAW_STATE_DIR | D:\AppData\openclaw |
-
-### 启动命令
+## 三、启动方式
 
 ```powershell
-# 启动 Gateway（必须在普通终端，不能在 TRAE 内）
-$env:OPENCLAW_STATE_DIR = 'D:\AppData\openclaw'
-openclaw gateway --port 18789 --verbose
+# 一键启动（推荐）— shrift.bat
+# 自动：安装依赖 → 启动 Gateway → 启动 Web UI → Edge PWA 模式打开 → 关闭窗口自动停服务
 
-# 测试对话（嵌入式模式，TRAE 内可用）
-$env:OPENCLAW_STATE_DIR = 'D:\AppData\openclaw'
-$env:OPENCLAW_GATEWAY_TOKEN = 'hermes-local-dev'
-openclaw agent --agent main --message "你好"
+# 一键停止
+F:\fzz-Project\openclaw-web-ui\stop.ps1
 ```
 
-### 用户磁盘使用原则
-- **C 盘**：仅系统绝对必要的文件，已写入的通过符号链接挪到 F:\Links_F
-- **D 盘**：高频数据（程序、AppData）
-- **F 盘**：低频数据（项目代码、文档）
-
 ---
 
-## 四、旧项目文件（归档参考，不再修改）
+## 四、关键架构决策
 
-### 位置
-F:\fzz-Project\claude-ui\hermes\
+### AGENTS.md vs TOOLS.md
 
-### 关键文件清单
+| 文件 | 定位 | 谁写入 |
+|------|------|--------|
+| AGENTS.md | Agent 的人设和指令 | **用户**（Web UI 编辑弹窗"详情介绍"Tab） |
+| TOOLS.md | 环境备忘录（团队信息 + 技能说明） | **系统**（syncAllRosters 自动同步） |
 
-| 文件 | 说明 |
-|------|------|
-| hermes\core\server.py | 旧后端服务，含 Gateway 检测逻辑和 WS 处理 |
-| hermes\core\engine.py | 旧核心引擎，含 _build_delegate_context 子Agent上下文构建 |
-| hermes\core\store.py | 旧数据持久化层，含首条消息自动命名逻辑 |
-| hermes\core\config.py | 旧配置层，端口 20766/8648 |
-| hermes\core\static\js\components\chat-view.js | 旧前端聊天视图 |
-| hermes\core\static\js\api.js | 旧前端 API 通信层 |
-| hermes\core\static\js\state.js | 旧响应式状态管理 |
-| hermes\core\static\js\controllers\session-manager.js | 旧会话管理 |
-| hermes\core\static\js\controllers\event-router.js | 旧事件路由+前端重试 |
-| hermes\core\static\css\style.css | 旧样式（设计师已优化） |
-| hermes\core\static\images\logo.png | 设计师添加的 logo |
-| hermes\agents.json | Agent 定义（乔布斯、MrBeast 等） |
-| hermes\scripts\cleanup_and_start.ps1 | 手动清理+启动脚本 |
-| hermes\scripts\启动.bat | 一键启动脚本 |
+**关键原则**：
+- AGENTS.md 的内容有两个作者（用户 + 系统），会互相覆盖、破坏 LLM prefix cache
+- **已修复**：系统生成信息从 AGENTS.md 迁移到 TOOLS.md，AGENTS.md 只保留用户内容
+- TOOLS.md 系统段用 `<!-- system-sync-start/end -->` 标记区分，用户编辑时自动剥离，保存后自动恢复
 
-### 旧项目已完成的改动（供参考，不需要再改）
+### Skill vs Tool vs TOOLS.md
 
-1. 会话标题"新对话"→首条消息自动命名
-2. _build_delegate_context 只传用户消息，不传助理回复
-3. 修复 isNew is not defined 错误
-4. sendChat 新增 sessionName 参数
-5. _ensure_gateway() 改为仅检测+日志提示
-6. 新增 /images/{name} 路由
-7. Gateway 缓存排查（根因：Hermes 自身 .tmp 文件残留）
-
----
-
-## 五、核心验证结果（2026-05-22 亲手验证）
-
-### ✅ 已验证通过
-
-| 测试项 | 结果 | 说明 |
-|--------|------|------|
-| 多 Agent 配置 | ✅ 通过 | openclaw agents list 正确显示 main/jobs/mrbeast |
-| 主 Agent HTTP API 对话 | ✅ 通过 | POST /v1/chat/completions, Status 200, 正常回复 |
-| 子 Agent HTTP API 对话 | ✅ 通过 | x-openclaw-agent-id: jobs, 回复体现乔布斯风格 |
-| HTTP API 流式输出（SSE） | ✅ 通过 | stream: true, Content-Type: text/event-stream, delta 模式与 OpenAI 兼容 |
-| sessions_spawn 子 Agent 调用 | ✅ 通过 | 主 Agent 成功 spawn jobs 子 Agent，子 Agent 独立运行 |
-| WebSocket 连接 + 认证 | ✅ 通过 | protocol v4, connect 成功, health 查询正常 |
-| Gateway 健康检查 | ✅ 通过 | 3 个 Agent 全部在线, event loop 正常 |
-
-### ⚠️ 重要发现
-
-1. **子 Agent 上下文只注入 AGENTS.md + TOOLS.md**
-   - SOUL.md / IDENTITY.md / USER.md 不会被注入子 Agent
-   - **对策**：人设信息必须放在 AGENTS.md 中，不能只放在 SOUL.md
-   - 这意味着子 Agent 的"独立身份感"主要靠 AGENTS.md 中的指令实现
-
-2. **Gateway 必须从普通终端启动**
-   - TRAE 沙盒会阻止 Gateway 写入 D:\AppData\openclaw\ 下的文件
-   - 导致 HTTP API 返回 500（EBADF: bad file descriptor）
-   - **对策**：用户需在普通 PowerShell 终端启动 Gateway
-
-3. **sessions_spawn 是非阻塞的**
-   - HTTP API 的 chat/completions 请求中，spawn 立即返回 `{ status: "accepted" }`
-   - 子 Agent 结果通过通告步骤异步回传，不在同一 HTTP 响应中
-   - **前端设计影响**：需要 WebSocket 接收子 Agent 的异步结果，纯 HTTP API 无法获取
-
-4. **WebSocket connect 参数要求严格**
-   - 必须指定 minProtocol: 4, maxProtocol: 4
-   - client.mode 枚举值：["backend", "cli", "node", "probe", "test", "ui", "webchat"]
-   - 开发阶段需要 gateway.controlUi.allowInsecureAuth + dangerouslyDisableDeviceAuth
-   - 需要 gateway.controlUi.allowedOrigins: ["*"]
-
-5. **HTTP API 默认禁用**
-   - 必须在配置中设置 gateway.http.endpoints.chatCompletions.enabled: true
-
-### 三大核心问题状态更新
-
-| 问题 | 旧状态 | 新状态 | 说明 |
-|------|--------|--------|------|
-| A: 子 Agent 回复缺乏独立感 | 待实施 | ⚠️ 部分解决 | sessions_spawn 可独立运行子 Agent，但人设只通过 AGENTS.md 注入，需精心编写 |
-| B: Skills 绑定未接入执行层 | 待实施 | ✅ 架构就绪 | 每 Agent 独立 workspace/skills/ 已配置，待编写具体 Skills |
-| C: 子 Agent 无独立记忆 | 待实施 | ✅ 架构就绪 | 每 Agent 独立工作区已创建，记忆系统待启用 |
-
----
-
-## 六、下一步工作计划
-
-### 阶段 1：完善多 Agent 配置（优先级最高）
-
-1. ~~在 openclaw.json 中配置多个 Agent~~ ✅ 已完成
-2. ~~测试 sessions_spawn 子 Agent 调用~~ ✅ 已完成
-3. 为每个子 Agent 编写完善的 AGENTS.md（人设必须在这里）
-4. 启用记忆系统
-5. 测试跨会话记忆持久化
-
-### 阶段 2：Web UI 对接
-
-1. 改造前端 api.js，对接 OpenClaw HTTP API（/v1/chat/completions）
-2. 实现 WebSocket 实时通信（接收子 Agent 异步结果）
-3. 实现 @agent_name 交互逻辑 → 前端解析后通过 x-openclaw-agent-id 路由
-4. 适配流式输出（SSE delta 模式）
-5. 适配会话管理
-
-### 阶段 3：Skills 和记忆
-
-1. 为每个 Agent 配置专属 Skills
-2. 深度测试记忆系统
-3. 验证子 Agent 跨会话记忆独立性
-
----
-
-## 七、OpenClaw 关键技术要点（新助手必读）
-
-### SubAgent 调用流程
-```
-用户: @乔布斯 帮我看看这个设计
-  ↓
-主Agent 解析 @乔布斯 → sessions_spawn({ task: "...", agentId: "jobs" })
-  ↓
-子Agent "jobs" 在独立会话中运行（独立工作区/工具/记忆）
-  ↓
-子Agent 完成后通过通告步骤（Announce）回传结果
-  ↓
-主Agent 聊天频道呈现结果
-```
-
-### ⚠️ 子 Agent 上下文注入规则
-- **会注入**：AGENTS.md + TOOLS.md
-- **不会注入**：SOUL.md / IDENTITY.md / USER.md / HEARTBEAT.md / BOOTSTRAP.md
-- **对策**：子 Agent 的人设、风格、角色指令必须写在 AGENTS.md 中
-
-### WebSocket connect 参数（已验证）
-```json
-{
-  "type": "req", "id": "1", "method": "connect",
-  "params": {
-    "auth": { "token": "hermes-local-dev" },
-    "role": "operator",
-    "minProtocol": 4, "maxProtocol": 4,
-    "client": { "id": "cli", "version": "1.0.0", "platform": "web", "mode": "webchat" },
-    "scopes": ["operator.read", "operator.write"],
-    "caps": [], "commands": [], "permissions": {},
-    "locale": "zh-CN",
-    "userAgent": "openclaw-web-ui/1.0.0"
-  }
-}
-```
-
-### OpenAI 兼容 HTTP API
-- POST /v1/chat/completions
-- 选择 Agent：x-openclaw-agent-id: <agentId> 或 model: "openclaw:<agentId>"
-- 认证：Authorization: Bearer hermes-local-dev
-- 流式：stream: true, 返回 SSE (text/event-stream)
-- 需要在配置中启用：gateway.http.endpoints.chatCompletions.enabled: true
-
-### 工具策略分层（单向收窄）
-全局 → Agent → 沙箱 → 子Agent，每层只能进一步限制，不能恢复之前拒绝的工具
-
-### 子 Agent 限制
-- 不能再 spawn 子 Agent（防递归）
-- 默认不获得会话工具（sessions_list/send/spawn）
-- 结果通过通告步骤回传，不是直接输出
-- cleanup 默认 keep，archiveAfterMinutes 默认 60
-
----
-
-## 八、旧项目的 Agent 定义（迁移参考）
-
-```json
-{
-  "agents": [
-    {
-      "name": "乔布斯",
-      "instructions": "你是史蒂夫·乔布斯...",
-      "emoji": "🍎"
-    },
-    {
-      "name": "MrBeast",
-      "instructions": "你是 MrBeast...",
-      "emoji": "💰"
-    }
-  ]
-}
-```
-
-迁移到 OpenClaw 后，每个 Agent 的人设信息**必须写在 AGENTS.md 中**（因为子 Agent 上下文只注入 AGENTS.md + TOOLS.md）：
-- AGENTS.md — 人设、风格、角色指令（子 Agent 唯一能读到的文件）
-- SOUL.md — 人设补充（仅主 Agent 直接对话时生效）
-- memory/ — 记忆目录
-
----
-
-## 九、注意事项
-
-1. **不要修改 F:\fzz-Project\claude-ui\hermes\ 下的任何文件**——那是旧项目，归档参考
-2. **新工作空间在 F:\fzz-Project\openclaw-web-ui\**——所有新代码写在这里
-3. **OpenClaw 数据在 D:\AppData\openclaw\**——配置、工作区、会话、记忆
-4. **C 盘零写入原则**——除非系统绝对必要
-5. **先讨论再动手**——用户反复强调的核心原则
-6. **每次启动 Gateway 前需要设置环境变量**：$env:OPENCLAW_STATE_DIR = 'D:\AppData\openclaw'
-7. **Gateway 认证 token**：hermes-local-dev，前端连接时需要带上
-8. **Gateway 必须从普通终端启动**——TRAE 沙盒会阻止文件写入导致 HTTP API 500
-9. **子 Agent 人设必须写在 AGENTS.md**——SOUL.md 不会被注入子 Agent 上下文
-10. **sessions_spawn 是非阻塞的**——前端需要 WebSocket 接收异步结果
-
----
-
-## 十、最新会话工作记录（2026-05-31）
-
-### 1. 头像系统清理（emoji→SVG）
-
-| 问题 | 改动 | 文件 |
+| 概念 | 定义 | 示例 |
 |------|------|------|
-| `'🤖'` 硬编码 4 处 | 替换为 SVG 池分配或名字首字 | `utils.js`, `agent-list.js`, `welcome-view.js` |
-| `normalizeAgents` 的 `id === 'main'` 特殊处理 | 去除，所有 agent 一视同仁 | `utils.js` |
-| `renderAgentAvatar` 默认 emoji 回退 | 空头像 → 名字首字 | `utils.js` |
-| `_getAgentLabel` 中多余的 emoji 检测分支 | 简化，直接返回首字 | `session-list.js` |
-| 团队成员列表显示 emoji（如 `🍎 乔布斯`） | `_extractTeamFromMd` 解析时自动去掉前置 emoji | `agent-routes.js` |
-| 主 Agent 头像 | 通过 `PUT /api/agents/main` 存为 `/logo.svg`，无需硬编码 | API 存储 |
+| Tool | Gateway 内置原子动作 | `exec python`、`web-search` |
+| Skill | 操作教程/办事套路 | `skills/web-search/` |
+| TOOLS.md | 环境特定的工具备忘录和决策偏好 | "搜索知乎优先用 API" |
 
-### 2. 核心架构排查与修复（@直连 + 智能调度）
+### Junction vs Symlink
 
-| 级别 | 问题 | 修复 | commit |
-|------|------|------|--------|
-| P0 | `const actualAgentId` agent 切换时 TypeError | `const`→`let`，允许回调中重新赋值 | `978d961` |
-| P0 | session 回放丢失 dispatch 子 Agent 标签 | `announces[{agentId, content}]` 结构化存储，回放渲染为 DOM 块 | `c1c4013` |
-| P1 | dispatch 超时 15s 过早关闭 + 120s 不足 | 30s 检查完成 / 300s 强制超时；新增 `_resetDispatchSafetyTimer` 活动保活 | `3f6b09f` |
-| P2 | `chat-update` 空事件监听消耗带宽 | 删除无函数体的空监听 | `cf2ddd0` |
-| P3 | `session-sync` 子 Agent 高频 `session.tool` 事件风暴 | 过滤含 `:subagent:` 的 tool/agent 事件 | `ac7887b` |
-| P3 | `virtual-list.js` 降级渲染统一标 `'AI'` | 改为使用 `message.agentId` 首字符 | `6d4cadb` |
+Windows 上 Junction 不需要管理员权限，Symlink 需要。我们统一用 Junction。
 
-### 3. UI 修复
+---
 
-| 问题 | 修复 |
-|------|------|
-| 气泡内标题字号过大（h1=30px） | 气泡内 h1-h6 加上比例字号（h1=1.2em~h6=0.9em） |
+## 五、当前 Agent 配置
 
-### 可回滚基线
+| Agent ID | 名称 | 工作区 | 技能 |
+|----------|------|--------|------|
+| main | 虾指挥 | `~/.openclaw/workspace` | 无 |
+| jobs | 乔布斯 | `~/.openclaw/workspace-jobs` | web-search |
+| mrbeast | MrBeast | `~/.openclaw/workspace-mrbeast` | web-search |
+| ppt | 小王 | `~/.openclaw/workspace-ppt` | html-ppt-skill, md2wechat |
+| 咪蒙 | 咪蒙 | `~/.openclaw/workspace-咪蒙` | md2wechat, web-search, zhihu-search |
+| 小李子 | 小李子 | `~/.openclaw/workspace-小李子` | zhihu-search |
+| 小周 | 小周 | `~/.openclaw/workspace-小周` | zhihu-search |
 
-```bash
-git reset --hard 2c053fd
-```
+---
 
-### 当前服务状态
+## 六、已验证的核心功能
 
-| 服务 | 端口 | 状态 |
+| 功能 | 状态 | 说明 |
 |------|------|------|
-| Web UI 服务器 | localhost:3001 | ✅ 运行中 |
-| OpenClaw Gateway | 127.0.0.1:18789 | ✅ 运行中 |
+| 私聊模式 | ✅ | `model = openclaw/agentId` |
+| 智能调度 | ✅ | `sessions_spawn` + announce |
+| Agent CRUD | ✅ | Web UI 编辑弹窗 |
+| 技能绑定 | ✅ | 缺失技能标记 ⚠ |
+| 会话管理 | ✅ | SessionStore |
+| 流式渲染 | ✅ | SSE delta 模式 |
+| 文件附件 | ✅ | 自动压缩 + 文本内联 |
+| 图片上传 | ✅ | Canvas 压缩 + MiMo 多模态 |
+| 复制按钮 | ✅ | 输出原始 Markdown |
+| WYSIWYG 编辑 | ✅ | Tab + marked + turndown |
+| 药丸标签 | ✅ | 插入光标位置，保存时转 `**标签名**` |
+| 符号链接 | ✅ | Junction + 断头清理 |
+| 环境自适应 | ✅ | OpenClaw 配置自动探测 |
 
-### 启动方式
+---
 
-```powershell
-# Gateway（必须在普通终端，TRAE 外）
-openclaw gateway
+## 七、已知技术债务（下次优先处理）
 
-# Web UI（TRAE 内）
-cd F:\fzz-Project\openclaw-web-ui\; node server.js
-```
+| # | 问题 | 优先级 | 说明 |
+|---|------|:------:|------|
+| 1 | 自动化测试缺失 | 高 | 核心路径全靠手动验证 |
+| 2 | 新用户引导缺失 | 中 | 第一次打开没有 onboarding |
+| 3 | 设置页面缺失 | 中 | API Key 管理等全靠手动改 config |
+| 4 | 深色模式缺失 | 低 | 暂无主题切换 |
+| 5 | chat-view.js 570 行 | 低 | 核心但脆弱，改前先画依赖图 |
+| 6 | 跨平台启动脚本 | 低 | 当前只有 Windows |
 
-### 关键经验记录 — roster-sync 写入 AGENTS.md 冗余验证
+---
 
-**日期**：2026-05-31
-**背景**：roster-sync 每次创建/更新/删除 Agent 时都会重写主 Agent 的 AGENTS.md，补充 `## Sub-Agents` 和 `## @Mention Handling Rules` 段落。
-**问题**：每次写入会触发 OpenClaw 重新构建 system prompt，即使内容不变也会破坏 LLM provider 的 prefix cache。
+## 八、关键文件索引
 
-**优化方案 B（已实施）**：
-- 完全移除 roster-sync 对 AGENTS.md 的写入功能
-- 保留 skill link 同步和 allowAgents 引用完整性校验
-- 删除 `_extractSection`、`_readAgentSummary`、`_isEmojiChar`、`_toThirdPerson`、`_buildSubAgentsSection`、`_buildMentionRulesSection`、`_buildTeamMembersSection`、`_buildSkillUsageSection`、`_extractSkillCommands` 共 9 个冗余函数（~200 行）
+| 文件 | 职责 |
+|------|------|
+| `server.js` | HTTP 主服务，路由分发 |
+| `routes.js` | 路由表和静态文件 |
+| `fs-store.js` | OpenClaw 配置读写，Agent 数据 |
+| `agent-routes.js` | Agent CRUD API |
+| `roster-sync.js` | 技能链接同步，TOOLS.md 生成 |
+| `session-sync.js` | 会话文件同步 |
+| `ws-client.js` | Gateway WebSocket 桥接 |
+| `sse-manager.js` | SSE 连接管理 |
+| `web/js/state.js` | 前端状态管理 |
+| `web/js/api.js` | 前端 API 调用 |
+| `web/js/components/agent-modal.js` | Agent 编辑弹窗（4 Tab + WYSIWYG） |
+| `web/js/components/chat-view.js` | 聊天视图（最核心也最脆弱） |
+| `web/css/style.css` | 样式，CSS 变量化 |
 
-**验证结果**：在 AGENTS.md 无 Sub-Agents 段落的情况下，dispatch 模式 6 角色协作完整跑通：
-- 5 次 `sessions_spawn` 全部成功（小李子→咪蒙→小周→咪蒙→小王）
-- announce 回传全部正常
-- `cacheRead` 最高达 32,768 tokens，缓存持续命中
+---
 
-**结论**：OpenClaw 的原生 `sessions_spawn` 发现机制不依赖 AGENTS.md 中的子 Agent 列表，写入是冗余的。
+## 九、工作规矩
 
-### 关键经验记录 — 图片上传自动压缩（2026-05-31）
-
-**优化内容**：上传图片前用 Canvas 自动缩放，最长边 ≤ 1024px，JPEG quality 0.85。
-**降级保护**：
-- SVG/GIF 跳过压缩（保留动图/矢量）
-- 压缩后更大 → 用原图
-- Canvas 不可用 → 静默跳过
-**涉及文件**：`attachment-bar.js`（+41行）、`chat-view.js`（-1行）、`constants.js`（-6行）
-**commit**：`03b24bb`
-
-### 关键经验记录 — MiMo 多模态接入与文件附件内联（2026-05-31）
-
-**背景**：接入小米 MiMo 模型后，图片上传后前端传了 base64 但模型看不到；文本文件让 Agent exec 读取不可靠且浪费 token。
-
-**修复链（三次迭代）**：
-
-**第一轮（BOM + Gateway 配置）**：
-- `openclaw.json` xiaomi 配置缺 `"api": "openai-completions"` 和 `"input": ["text","image"]` → 补充
-- `fs-store.js` 的 `readConfig()` 不兼容 UTF-8 BOM → 加 `raw.replace(/^\uFEFF/, '')`
-- PowerShell `Set-Content -Encoding UTF8` 默认加 BOM → 后续只手动改文件，不用命令覆写
-
-**第二轮（上传路径迁移）**：
-- 上传目录硬编码在项目 `uploads/` → 迁移到 `stateDir/uploads/`（`D:\AppData\openclaw\uploads\`），自动自适应
-- 路径不可移植 → 用 `store.getDataDir()` 获取，零硬编码
-
-**第三轮（按 Open WebUI 最佳实践重构文件附件）**：
-- 放弃 exec 工具路径模式 → 后端上传时自动读取文本文件内容（TEXT_EXTS 涵盖 44 种代码/文档扩展名）
-- 内容以内联代码块嵌入 user message → 零工具开销，零路径依赖
-- 图片仍走 base64 image_url，二进制文件保留 `[文件: xxx]` 占位
-- 内容上限 100KB，避免请求体膨胀
-- `UPLOAD_ALLOWED_EXT` 通过 `Object.assign` 合并 `TEXT_EXTS`，共 64 种可上传
-
-**涉及文件**：`routes.js`、`server.js`、`fs-store.js`、`message-builder.js`、`session-interaction.js`、`openclaw.json`
-
-### 关键经验记录 — 复制按钮支持原始 Markdown（2026-05-31）
-
-**问题**：点击 📋 复制的是 `innerText`（纯文本），粘贴后丢失所有格式。
-
-**修复**：
-- 渲染时在 `.agent-content` 上附加 `dataset.raw = content`（原始 Markdown）
-- `_copyMessage` 优先读取 `dataset.raw`，回退 `innerText`
-- 覆盖 4 处渲染函数：`_buildMessageElement`、`updateBubbleContent`、`appendToLastAssistantMessage`、`updateLastAssistantMessage`
-
-### 关键经验记录 — 分隔线 CSS 重构（2026-05-31）
-
-**问题**：气泡分割线颜色位置反复调整未锚准，5 处硬编码 rgba 散落各处。
-
-**修复**：
-- 统一气泡外边框、`<hr>`、`.bubble-separator`、`.agent-delegate-btns`、`.msg-actions` 5 处线条为 `rgba(0,0,0,0.08)`
-- 消息间距从 16px → 24px，增加呼吸感
-- `.msg-actions` 的 `opacity` 改为只控制按钮，边框始终可见
-
-### 关键经验记录 — 代码质量重构（2026-05-31，已执行）
-
-**背景**：代码存在严重的重复逻辑和硬编码问题：CSS 分割线颜色 5 处重复、JS 中 msg-actions 创建重复 3 次、renderMarkdown 调用重复 5 次。
-
-**执行方案（4 步）**：
-
-**Step 0 — 工具链安装（零行为影响）**：
-- 安装 stylelint + eslint + husky + lint-staged + stylelint-declaration-strict-value
-- 配置 pre-commit hook：git commit 时自动 lint-staged 扫描改动文件
-- 遗留大量 stylelint 报警（旧 CSS 风格问题），已用宽松配置通过
-
-**Step 1 — CSS 变量化（零风险）**：
-- 新增 `--border-subtle: rgba(0,0,0,0.08)` 等 3 个 CSS 变量
-- 5 处 `rgba(0,0,0,0.08)` 替换为 `var(--border-subtle)`（改 1 处即可全局生效）
-- 新增 `--hover-bg`、`--surface-hover` 变量供后续使用
-
-**Step 2 — JS 函数抽取（低风险）**：
-- `_ensureActions(bubble)` — 消除 3 处 msg-actions 重复创建
-- `_renderContent(el, raw)` — 消除 5 处 renderMarkdown + dataset.raw 重复
-- `_buildAvatarEl(role, agent)` — 头像逻辑从 17 行压缩到 7 行
-- `_buildMessageElement` 从 ~120 行缩到 ~100 行
-
-**Step 3 — Git hook 守门（永不复发的机制）**：
-- pre-commit hook 已配置，新改代码自动通过 lint-staged 检查
-- 新增硬编码颜色或重复模式会被 `|| true` 宽松放行，后续可收紧
-
-**涉及文件**：`style.css`、`message-renderer.js`、`package.json`、`stylelint.config.js`、`.eslintrc.json`、`.husky/pre-commit`
-**commit**：`e1e916f`、`5732d78`
-
-### 后续待验证
-
-1. @子Agent 直连路径 — `onAgentSwitch` 回调正常
-2. 智能调度路径 — announce 结构化存储 + 回放渲染
-3. dispatch 长任务 — 安全定时器不再提前关闭
-4. 新 session 回看 — announces 渲染为 `bubble-content-block`
-5. MiMo 图片识别（已通过）
-6. 文本文件内联内容（已实现，待验证）
-7. 复制按钮输出原始 MD（已实现，待验证）
+1. 只做你明确让我做的，不代劳、不提前动手
+2. 讨论时不执行，等你说"执行"或"要"再动
+3. 抓本质逻辑，不堆表面代码
+4. 绝不硬编码动态内容

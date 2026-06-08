@@ -1,5 +1,6 @@
 node_modules/
 _backup*/
+_archive/
 backup-20*/
 uploads/
 sessions/

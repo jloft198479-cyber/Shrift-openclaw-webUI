@@ -15,9 +15,11 @@ const ChatController = {
   _spawnDetected: false,
   _activeSubagents: new Set(),
   _completedSubagents: new Set(),
-  _announcedFingerprints: new Set(),
+  _announcedOffsets: new Set(), // 用 agentId+offset 去重，替代内容指纹
   _dispatchSafetyTimer: null,
   _dispatchLongTimer: null,
+  _announceQueue: [], // streaming 期间的 announce 消息排队，避免丢弃
+  _lastSpawnTime: 0, // 最后一次检测到子 Agent 的时间
 
   sendMessage: async function () {
     if (State.streaming) return;
@@ -126,10 +128,7 @@ const ChatController = {
           DebugTrace.log('onDone', { resolvedAgentId: resolvedAgentId, actualAgentId: actualAgentId, interactionMode: State.interactionMode, spawnDetected: self._spawnDetected });
           if (State.interactionMode !== 'dispatch' && resolvedAgentId && resolvedAgentId !== 'main') actualAgentId = resolvedAgentId;
           const finalText = st.text;
-          if (finalText) {
-            var fp = finalText.substring(0, 200).replace(/\s/g, '');
-            self._announcedFingerprints.add(fp);
-          }
+          // onDone 不再记录内容指纹，改由 handleAnnounceResult 用 offset 去重
           if (self._spawnDetected) {
             self._spawnDetected = false;
             State.setState({ dispatching: true });
@@ -141,7 +140,7 @@ const ChatController = {
                   self._checkDispatchComplete();
                 }
               }
-            }, 30000);
+            }, 15000);
             self._dispatchLongTimer = setTimeout(function () {
               if (State.dispatching) {
                 DebugTrace.log('dispatch-long-timeout', {});
@@ -160,6 +159,8 @@ const ChatController = {
           }
           State.setState({ sessions: SessionStore.getList() });
           cleanupChat();
+          // streaming 结束后，处理排队中的 announce 消息
+          self._flushAnnounceQueue();
         },
         onError: function (err) {
           MessageRenderer.showError(st.bubble, '错误', err.message || '请求失败');
@@ -198,11 +199,21 @@ const ChatController = {
     return '';
   },
 
-  handleAnnounceResult: function (messages, agentId, sessionId) {
-    DebugTrace.log('handleAnnounceResult', { agentId: agentId, sessionId: sessionId || '', msgCount: messages ? messages.length : 0, interactionMode: State.interactionMode, streaming: State.streaming, dispatching: State.dispatching });
+  handleAnnounceResult: function (messages, agentId, sessionId, offset) {
+    DebugTrace.log('handleAnnounceResult', { agentId: agentId, sessionId: sessionId || '', offset: offset || 0, msgCount: messages ? messages.length : 0, interactionMode: State.interactionMode, streaming: State.streaming, dispatching: State.dispatching });
     if (!messages || messages.length === 0) return;
     if (State.interactionMode === 'direct') return;
-    if (State.streaming) return;
+
+    // 用 agentId+offset 去重，替代内容指纹（避免相似内容误判）
+    const dedupeKey = (agentId || 'main') + ':' + (offset || 0);
+    if (this._announcedOffsets.has(dedupeKey)) return;
+    this._announcedOffsets.add(dedupeKey);
+
+    // streaming 期间不丢弃，排队等待
+    if (State.streaming) {
+      this._announceQueue.push({ messages: messages, agentId: agentId, sessionId: sessionId, offset: offset });
+      return;
+    }
 
     let lastMsg = null;
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -213,10 +224,6 @@ const ChatController = {
       }
     }
     if (!lastMsg) return;
-
-    var fp = (lastMsg.content || '').substring(0, 200).replace(/\s/g, '');
-    if (this._announcedFingerprints.has(fp)) return;
-    this._announcedFingerprints.add(fp);
 
     const resolvedAgentId = agentId || lastMsg.agentId || '';
 
@@ -267,6 +274,7 @@ const ChatController = {
       const agentId = keys[i];
       const toolName = progress[agentId].toolName || '';
       this._activeSubagents.add(agentId);
+      this._lastSpawnTime = Date.now();
 
       if (this._progressElements[agentId]) {
         MessageRenderer.updateProgressBlock(agentId, 'running', toolName);
@@ -288,6 +296,7 @@ const ChatController = {
     if (!agentId) return;
     this._activeSubagents.add(agentId);
     this._completedSubagents.add(agentId);
+    this._lastSpawnTime = Date.now();
 
     if (!this._progressElements[agentId]) {
       const agent = State.findAgent(agentId);
@@ -304,8 +313,15 @@ const ChatController = {
 
   _checkDispatchComplete: function () {
     if (!State.dispatching) return;
-    if (this._activeSubagents.size === 0) return;
-    if (this._completedSubagents.size < this._activeSubagents.size) return;
+    if (this._completedSubagents.size === 0) return;
+
+    // 判定完成条件：
+    // 1. 所有已知子 Agent 都完成了（completed >= active）
+    // 2. 或者有子 Agent 完成了，且距离最后 spawn 已超过10秒（说明不会再有新子 Agent 了）
+    const allDone = this._completedSubagents.size >= this._activeSubagents.size;
+    const spawnQuiet = this._lastSpawnTime > 0 && (Date.now() - this._lastSpawnTime > 10000);
+
+    if (!allDone && !spawnQuiet) return;
 
     DebugTrace.log('dispatch-complete', { active: this._activeSubagents.size, completed: this._completedSubagents.size });
     State.setState({ dispatching: false });
@@ -325,7 +341,7 @@ const ChatController = {
     setTimeout(function () {
       self._activeSubagents.clear();
       self._completedSubagents.clear();
-      self._announcedFingerprints.clear();
+      self._announcedOffsets.clear();
       self._progressElements = {};
     }, 2000);
   },
@@ -334,6 +350,15 @@ const ChatController = {
   },
 
   _hideDispatchStatusBar: function () {
+  },
+
+  _flushAnnounceQueue: function () {
+    if (this._announceQueue.length === 0) return;
+    var queue = this._announceQueue.slice();
+    this._announceQueue = [];
+    for (var i = 0; i < queue.length; i++) {
+      this.handleAnnounceResult(queue[i].messages, queue[i].agentId, queue[i].sessionId, queue[i].offset);
+    }
   },
 
   _clearDispatchState: function () {
@@ -350,9 +375,10 @@ const ChatController = {
     }
     this._activeSubagents.clear();
     this._completedSubagents.clear();
-    this._announcedFingerprints.clear();
+    this._announcedOffsets.clear();
     this._progressElements = {};
     this._spawnDetected = false;
+    this._announceQueue = [];
     this._hideDispatchStatusBar();
   },
 
@@ -365,10 +391,8 @@ const ChatController = {
     this._dispatchSafetyTimer = setTimeout(function () {
       if (State.dispatching) {
         DebugTrace.log('dispatch-safety-timeout', { active: self._activeSubagents.size, completed: self._completedSubagents.size });
-        if (self._activeSubagents.size > 0 && self._completedSubagents.size >= self._activeSubagents.size) {
-          self._checkDispatchComplete();
-        }
+        self._checkDispatchComplete();
       }
-    }, 30000);
+    }, 15000);
   },
 };

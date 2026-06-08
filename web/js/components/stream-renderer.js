@@ -67,7 +67,7 @@ const StreamRenderer = {
         st.bubble.appendChild(contentEl);
       }
       if (st.text) {
-        contentEl.innerHTML = renderMarkdown(st.text);
+        contentEl.innerHTML = renderMarkdown(st.text, true); // 流式期间不写缓存
       } else if (st.preparing) {
         contentEl.innerHTML = '<div class="preparing-indicator"><span class="preparing-dot"></span><span class="preparing-dot"></span><span class="preparing-dot"></span> 正在准备…</div>';
       } else {
@@ -92,10 +92,6 @@ const StreamRenderer = {
   },
 
   /**
-   * 结束流式状态：最终渲染 + 恢复 UI
-   */
-
-  /**
    * 开始流：唯一入口，清残留后启动
    */
   beginStreaming: function (cleanupFn) {
@@ -111,10 +107,19 @@ const StreamRenderer = {
     this._pendingCleanup = cleanupFn || null;
   },
   endStreaming: function (skipCleanup) {
+    const st = this._streamState;
+
+    // 最终渲染：写入缓存
+    if (st && st.text && st.bubble) {
+      const contentEl = st.bubble.querySelector('.agent-content');
+      if (contentEl) {
+        contentEl.innerHTML = renderMarkdown(st.text, false);
+      }
+    }
+
     if (this._rafId) {
       cancelAnimationFrame(this._rafId);
       this._rafId = null;
-      this.renderBubble();
     }
 
     if (!skipCleanup && this._pendingCleanup) {
@@ -130,26 +135,22 @@ const StreamRenderer = {
     const input = document.getElementById('input');
     if (input) input.focus();
 
-    const st = this._streamState;
     if (st && st.bubble) {
       st.bubble.classList.remove('streaming-cursor');
       if (st._thinkBlock) {
         const toggle = st._thinkBlock.querySelector('.thinking-toggle');
         if (toggle) toggle.textContent = '💭 已深度思考';
       }
-    }
-
-    this.resetStreamState();
-
-    // 流式结束后给气泡添加操作按钮
-    if (st && st.bubble && st.bubble.querySelector('.agent-content')) {
-      if (!st.bubble.querySelector('.msg-actions')) {
+      // 流式结束后给气泡添加操作按钮（在 resetStreamState 之前，st 仍引用旧对象）
+      if (st.bubble.querySelector('.agent-content') && !st.bubble.querySelector('.msg-actions')) {
         const actions = document.createElement('div');
         actions.className = 'msg-actions';
         actions.innerHTML = '<button class="msg-act-btn" data-action="copy" title="复制">📋</button>';
         st.bubble.appendChild(actions);
       }
     }
+
+    this.resetStreamState();
   },
 
   /**

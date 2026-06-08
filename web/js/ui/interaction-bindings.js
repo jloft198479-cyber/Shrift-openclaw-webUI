@@ -99,19 +99,6 @@ const InteractionBindings = {
       State.setState({ filter: btn.dataset.filter || '' });
     });
 
-    const restartBtn = document.getElementById('restart-server-btn');
-    self._addListener(restartBtn, 'click', async function () {
-      if (!confirm('确定要重启服务器吗？')) return;
-      try {
-        const res = await fetch('/api/restart', { method: 'POST' });
-        const data = await res.json();
-        showToast(data.message || '服务器正在重启…', Constants.TIMEOUT.TOAST_INFO, 'info');
-        setTimeout(function () { location.reload(); }, Constants.TIMEOUT.RESTART_REFRESH_DELAY);
-      } catch (err) {
-        showToast('重启请求失败: ' + err.message, Constants.TIMEOUT.TOAST_ERROR, 'error');
-      }
-    });
-
     const folderBtn = document.getElementById('open-folder-btn');
     self._addListener(folderBtn, 'click', async function () {
       try {

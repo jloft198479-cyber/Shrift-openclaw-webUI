@@ -1,6 +1,5 @@
 /* ── message-builder.js — API 消息构建（纯函数，零 DOM 依赖）──── */
 
-const _ATT_LINE_RE = /^[\u{1F5BC}\u{1F4C4}\u{1F4E6}\u{1F4DD}\u{1F4CA}\u{1F4C3}\u{1F4CE}]\s/u;
 const MessageBuilder = {
 
   buildApiMessages: function (session, agentId, displayText, attachmentPaths) {
@@ -71,7 +70,7 @@ const MessageBuilder = {
     const parts = [];
 
     const cleanText = (textContent || '').split('\n').filter(function (line) {
-      return !_ATT_LINE_RE.test(line);
+      return !Constants.REGEX.ATTACHMENT_LINE_TEST.test(line);
     }).join('\n').trim();
     if (cleanText) {
       parts.push({ type: 'text', text: cleanText });

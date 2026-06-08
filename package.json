@@ -4,7 +4,8 @@
   "description": "Shrift - A lightweight Web UI for OpenClaw",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "check": "node tools/check-js.js"
   },
   "dependencies": {
     "ws": "^8.20.1"
