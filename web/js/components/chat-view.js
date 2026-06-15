@@ -112,4 +112,11 @@ const ChatView = {
   stopGeneration: function () {
     ChatController.stopGeneration();
   },
+
+  /**
+   * 取消调度
+   */
+  cancelDispatch: function () {
+    ChatController.cancelDispatch();
+  },
 };

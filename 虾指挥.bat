@@ -4,7 +4,7 @@
 
 :: 确保 Node.js 在 PATH 中
 where node >nul 2>&1 || (
-  set PATH=D:\nodejs;D:\nodejs\npm-global;%PATH%
+  set "PATH=D:\nodejs;D:\nodejs\npm-global;%PATH%"
 )
 
 :: 启动 launcher

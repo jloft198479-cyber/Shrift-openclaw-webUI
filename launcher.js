@@ -166,8 +166,10 @@ function acquireLock() {
       var pid = parseInt(fs.readFileSync(LOCK_FILE, 'utf8'), 10);
       try {
         process.kill(pid, 0);
-        console.error('[Launcher] 另一个实例已在运行 (PID=' + pid + ')');
-        process.exit(1);
+        // 旧实例还活着，尝试把 PWA 窗口弹到前台
+        console.log('[Launcher] 已有实例运行 (PID=' + pid + ')，激活窗口...');
+        _bringPwaToFront();
+        process.exit(0);
       } catch (e) {
         // 进程不存在，过期锁文件
         try { fs.unlinkSync(LOCK_FILE); } catch (e2) {}
@@ -177,6 +179,15 @@ function acquireLock() {
       fs.mkdirSync(path.dirname(LOCK_FILE), { recursive: true });
     }
     fs.writeFileSync(LOCK_FILE, String(process.pid));
+  } catch (e) {}
+}
+
+/** 将已有 PWA 窗口弹到前台 */
+function _bringPwaToFront() {
+  // 最简单可靠的方式：用 start 打开 URL，浏览器会自动激活已有的 PWA 窗口
+  // 无需 wmic/PowerShell，零依赖，兼容所有 Windows 版本
+  try {
+    execSync('start "" "' + WEBUI_URL + '"', { timeout: 5000, windowsHide: true });
   } catch (e) {}
 }
 

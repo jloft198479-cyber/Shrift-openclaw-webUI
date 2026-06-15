@@ -26,6 +26,29 @@ function _getMdRenderer() {
       + '<pre class="code-pre"><code id="' + id + '" class="' + (lang ? 'language-' + Utils.escapeHtml(lang) : '') + '">' + code + '</code></pre>'
       + '</div>';
   };
+  /* 图片渲染：将本地绝对路径转换为 /api/file 代理 URL */
+  _mdRenderer.image = function(obj) {
+    var href = typeof obj === 'object' ? (obj.href || '') : (obj || '');
+    var text = typeof obj === 'object' ? (obj.text || obj.title || '') : '';
+    var title = typeof obj === 'object' ? (obj.title || '') : '';
+    var src = href;
+
+    // 检测本地绝对路径并转换
+    // 1. /D:/... 或 /C:/... 格式（Unix 风格 Windows 路径）
+    if (/^\/[A-Za-z]:\//.test(src)) {
+      src = src.substring(1);
+    }
+    // 2. 已经是绝对路径（Windows 或 Unix）→ 转为 /api/file URL
+    if (/^[A-Za-z]:[\\\/]/.test(src) || /^\//.test(src)) {
+      src = '/api/file?path=' + encodeURIComponent(src);
+    }
+
+    var attrs = 'src="' + Utils.escapeHtml(src) + '"';
+    if (text) attrs += ' alt="' + Utils.escapeHtml(text) + '"';
+    if (title) attrs += ' title="' + Utils.escapeHtml(title) + '"';
+    attrs += ' loading="lazy"';
+    return '<img ' + attrs + '>';
+  };
   return _mdRenderer;
 }
 
@@ -43,6 +66,11 @@ function renderMarkdown(text, streaming) {
   if (!text) return '';
   const cached = _mdCache.get(text);
   if (cached) return cached;
+  // 预处理：纯文本图片路径 → markdown 图片语法，让 _mdRenderer.image 接管渲染
+  text = text.replace(/(?<!\]\()([A-Za-z]:[\\\/][^\s<>|*]+\.(png|jpg|jpeg|gif|svg|webp))(?!\()/gi, function(match, path) {
+    var name = path.split(/[\\\/]/).pop();
+    return '![' + name + '](' + path.replace(/\\/g, '/') + ')';
+  });
   let html;
   if (typeof marked !== 'undefined') {
     const raw = marked.parse(text, { breaks: true, gfm: true, renderer: _getMdRenderer() });

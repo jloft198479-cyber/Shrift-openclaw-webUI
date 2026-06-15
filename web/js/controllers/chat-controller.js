@@ -26,6 +26,7 @@ const ChatController = {
     if (State.dispatching) return;
 
     this._clearDispatchState();
+    this._lastStreamedText = '';
 
     const input = document.getElementById('input');
     const sendBtn = document.getElementById('send-btn');
@@ -128,7 +129,7 @@ const ChatController = {
           DebugTrace.log('onDone', { resolvedAgentId: resolvedAgentId, actualAgentId: actualAgentId, interactionMode: State.interactionMode, spawnDetected: self._spawnDetected });
           if (State.interactionMode !== 'dispatch' && resolvedAgentId && resolvedAgentId !== 'main') actualAgentId = resolvedAgentId;
           const finalText = st.text;
-          // onDone 不再记录内容指纹，改由 handleAnnounceResult 用 offset 去重
+          self._lastStreamedText = finalText || '';
           if (self._spawnDetected) {
             self._spawnDetected = false;
             State.setState({ dispatching: true });
@@ -151,8 +152,8 @@ const ChatController = {
           }
           StreamRenderer.endStreaming();
           if (session) {
-            const msgObj = { role: 'assistant', content: finalText };
-            if (actualAgentId && actualAgentId !== 'main') msgObj.agentId = actualAgentId;
+            const msgObj = { role: 'assistant', content: finalText, agentId: actualAgentId || 'main' };
+            if (st.thinking) msgObj.thinking = st.thinking;
             session.messages.push(msgObj);
             session.updated_at = Date.now();
             SessionStore.save(session);
@@ -182,6 +183,16 @@ const ChatController = {
 
   stopGeneration: function () {
     StreamRenderer.stopGeneration();
+  },
+
+  /**
+   * 取消调度 — 用户点击 cancel 按钮时调用
+   * 清理所有 dispatch 状态，停止等待子 Agent 结果
+   */
+  cancelDispatch: function () {
+    DebugTrace.log('cancelDispatch', { active: this._activeSubagents.size, completed: this._completedSubagents.size });
+    this._clearDispatchState();
+    StreamRenderer._resetSendBtn();
   },
 
   _cleanupChat: function () {
@@ -224,6 +235,16 @@ const ChatController = {
       }
     }
     if (!lastMsg) return;
+
+    // 内容锚点比对：跳过已通过 SSE 流送达的主 Agent 首次回复
+    if (this._lastStreamedText && lastMsg.content) {
+      var announceText = lastMsg.content.trim();
+      var streamedText = this._lastStreamedText.trim();
+      if (announceText && streamedText && announceText === streamedText) {
+        DebugTrace.log('announce-dedup-anchor-match', { agentId: agentId, offset: offset });
+        return;
+      }
+    }
 
     const resolvedAgentId = agentId || lastMsg.agentId || '';
 
@@ -347,9 +368,13 @@ const ChatController = {
   },
 
   _updateDispatchStatusBar: function () {
+    if (State.dispatching) {
+      StreamRenderer.showCancelBtn();
+    }
   },
 
   _hideDispatchStatusBar: function () {
+    StreamRenderer._resetSendBtn();
   },
 
   _flushAnnounceQueue: function () {
@@ -379,6 +404,7 @@ const ChatController = {
     this._progressElements = {};
     this._spawnDetected = false;
     this._announceQueue = [];
+    this._lastStreamedText = '';
     this._hideDispatchStatusBar();
   },
 

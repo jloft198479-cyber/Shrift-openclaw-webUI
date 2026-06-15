@@ -52,15 +52,12 @@ let _lastAgentId = '';
 function _extractAgentIdFromKey(sessionKey) {
   if (!sessionKey) return '';
   const parts = sessionKey.split(':');
-  // agent:<agentId>:subagent:<subAgentId>:webui:<sessionId>
-  if (parts.length >= 4 && parts[0] === 'agent' && parts[2] === 'subagent') {
-    return parts[3] !== 'main' ? parts[3] : '';
-  }
+  if (parts.length < 2 || parts[0] !== 'agent' || !parts[1]) return '';
+  // 所有格式统一从 parts[1] 取 agent ID（ppt, agent-mpr5t5r2vi0e 等）
   // agent:<agentId>:webui:<sessionId>
-  if (parts.length >= 2 && parts[0] === 'agent') {
-    return parts[1] !== 'main' ? parts[1] : '';
-  }
-  return '';
+  // agent:<agentId>:subagent:<uuid>  (JSONL 子 Agent 消息)
+  // agent:<agentId>:subagent:<uuid>:webui:<sessionId>
+  return parts[1] !== 'main' ? parts[1] : '';
 }
 
 function _extractFrontendSessionId(sessionKey) {
@@ -90,11 +87,17 @@ function onSubagentGatewayEvent(data) {
         debugTrace.trace('lastAgentId-change', { from: oldId, to: _lastAgentId, trigger: eventName, sessionKey: sessionKey });
       }
     }
-    if (eventName === 'sessions.changed' || eventName === 'session.created' || eventName === 'session.updated') {
-      _scheduleRead(sessionKey, frontendSessionId);
-  } else if ((eventName === 'session.tool' || eventName === 'agent') && sessionKey && sessionKey.indexOf(':subagent:') < 0) {
-      _scheduleRead(sessionKey, frontendSessionId);
-  }
+    // 只处理主 Agent 事件（sessionKey 不含 :subagent:），广播主 Agent 的合成消息
+    // 子 Agent 的结果通过 OpenClaw 内部 sessions_spawn 机制传给主 Agent，
+    // 主 Agent 综合后产出的新消息才是该广播给用户的内容。
+    // 子 Agent 的中间消息（英文思考过程等）不应出现在 UI 中。
+    if (sessionKey && sessionKey.indexOf(':subagent:') < 0) {
+      if (eventName === 'sessions.changed' || eventName === 'session.created'
+          || eventName === 'session.updated' || eventName === 'session.tool'
+          || eventName === 'agent') {
+        _scheduleRead(sessionKey, frontendSessionId);
+      }
+    }
   } catch (e) { _logError('gatewayEvent', e); }
 }
 
@@ -238,7 +241,20 @@ function _findTargetFile(sessionKey) {
   try {
     const stateDir = _resolveStateDir();
     if (!stateDir) return null;
-    const sessionsDir = path.join(stateDir, MAIN_AGENT_SESSIONS_SUBDIR);
+
+    // 从 sessionKey 第二段提取 agentId，定位正确的 agent sessions 目录
+    // agent:main:webui:xxx → main → agents/main/sessions
+    // agent:ppt:subagent:xxx → ppt → agents/ppt/sessions
+    let sessionsDir;
+    if (sessionKey) {
+      const parts = sessionKey.split(':');
+      const agentId = (parts.length >= 2 && parts[1]) ? parts[1] : 'main';
+      sessionsDir = path.join(stateDir, 'agents', agentId, 'sessions');
+    } else {
+      // startSync 空 sessionKey 走主目录
+      sessionsDir = path.join(stateDir, MAIN_AGENT_SESSIONS_SUBDIR);
+    }
+
     if (!fs.existsSync(sessionsDir)) return null;
     const files = fs.readdirSync(sessionsDir).filter(function (f) { return f.endsWith('.jsonl') && f.indexOf('trajectory') < 0; });
     if (files.length === 0) return null;
@@ -253,6 +269,7 @@ function _findTargetFile(sessionKey) {
       }
     }
 
+    // 同目录内 fallback：取最近修改的非心跳文件
     files.sort(function (a, b) {
       let ta = 0, tb = 0;
       try { ta = fs.statSync(path.join(sessionsDir, a)).mtimeMs; } catch (e) {}

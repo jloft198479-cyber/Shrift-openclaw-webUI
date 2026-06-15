@@ -51,6 +51,11 @@ function createProxy(gwHost, gwPort, gwToken, store) {
     });
     gwReq.write(raw);
     gwReq.end();
+
+    // 客户端断连时，关闭到 Gateway 的请求，触发 Gateway abort agent
+    res.on('close', function () {
+      gwReq.destroy();
+    });
   }
 
   function checkHealth(res) {

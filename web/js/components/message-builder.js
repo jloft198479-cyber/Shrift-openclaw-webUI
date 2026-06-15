@@ -7,34 +7,38 @@ const MessageBuilder = {
     const targetAgentId = agentId || 'main';
     const ap = attachmentPaths || [];
 
+    const mainDisplayName = (function () {
+      const mainAgent = State.findAgent('main');
+      return mainAgent ? (mainAgent.displayName || mainAgent.name) : '主助理';
+    })();
+
     let apiMessages = chatMessages.map(function (m) {
       if (m.role === 'assistant' && m.agentId && m.agentId !== targetAgentId) {
         const srcAgent = State.findAgent(m.agentId);
         const srcName = srcAgent ? (srcAgent.displayName || srcAgent.name) : m.agentId;
-        var announceText = m.content || '';
-        if (m.announces && m.announces.length > 0) {
-          for (let k = 0; k < m.announces.length; k++) {
-            announceText += '\n\n---\n\n';
-            if (m.announces[k].agentId) announceText += '[' + m.announces[k].agentId + '] ';
-            announceText += m.announces[k].content;
-          }
+        return { role: 'assistant', content: '[' + srcName + ' said]: ' + (m.content || '') };
+      }
+
+      // 兜底：无 agentId 的 assistant 消息（旧 session 数据），direct 模式下标为 [主助理 said]
+      // 注意：这是向后兼容的临时措施，等 chat-controller.js 的 agentId 保存覆盖所有旧数据后可移除
+      if (m.role === 'assistant' && !m.agentId && targetAgentId !== 'main') {
+        return { role: 'assistant', content: '[' + mainDisplayName + ' said]: ' + (m.content || '') };
+      }
+
+      // direct 模式下，重写 user 消息内嵌的 [Chat messages] 块，给 Assistant 行加说话人标注
+      if (m.role === 'user' && targetAgentId !== 'main') {
+        var rewrittenContent = MessageBuilder._rewriteEmbeddedChatContext(m.content || '', mainDisplayName);
+        if (m.attachments && m.attachments.length > 0) {
+          return MessageBuilder.buildMultimodalMessage(rewrittenContent, m.attachments);
         }
-        return { role: 'assistant', content: '[' + srcName + ' said]: ' + announceText };
+        return { role: 'user', content: rewrittenContent };
       }
 
       if (m.role === 'user' && m.attachments && m.attachments.length > 0) {
         return MessageBuilder.buildMultimodalMessage(m.content, m.attachments);
       }
 
-      var msgContent = m.content || '';
-      if (m.announces && m.announces.length > 0) {
-        for (let k = 0; k < m.announces.length; k++) {
-          msgContent += '\n\n---\n\n';
-          if (m.announces[k].agentId) msgContent += '[' + m.announces[k].agentId + '] ';
-          msgContent += m.announces[k].content;
-        }
-      }
-      return { role: m.role, content: msgContent };
+      return { role: m.role, content: m.content || '' };
     });
 
     if (apiMessages.length === 0) {
@@ -60,6 +64,29 @@ const MessageBuilder = {
       return '\n' + icon + ' ' + (a.name || '附件');
     }).join('');
     return (text || '') + attInfo;
+  },
+
+  /**
+   * 重写 user 消息内嵌的 [Chat messages] 块，给 Assistant 行加说话人标注
+   * 只在 direct 模式（targetAgentId !== 'main') 调用，dispatch 模式不调用
+   * @param {string} text - 原始消息文本
+   * @param {string} displayName - 主助理的显示名称
+   * @returns {string} 重写后的文本
+   */
+  _rewriteEmbeddedChatContext: function (text, displayName) {
+    if (!text) return text;
+    var marker = '[Chat messages since your last reply - for context]';
+    var markerIdx = text.indexOf(marker);
+    if (markerIdx < 0) return text;
+
+    // 只重写 marker 之后的部分，marker 之前的内容原样保留
+    var beforeMarker = text.substring(0, markerIdx + marker.length);
+    var afterMarker = text.substring(markerIdx + marker.length);
+
+    // 替换块内紧跟换行符的 "Assistant:" 行
+    var rewritten = afterMarker.replace(/\nAssistant:/g, '\nAssistant [' + displayName + ']:');
+
+    return beforeMarker + rewritten;
   },
 
   buildMultimodalMessage: function (textContent, attachments) {

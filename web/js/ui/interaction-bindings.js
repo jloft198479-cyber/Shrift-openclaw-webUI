@@ -128,7 +128,9 @@ const InteractionBindings = {
 
     const sendBtn = document.getElementById('send-btn');
     self._addListener(sendBtn, 'click', function () {
-      if (State.streaming) { ChatView.stopGeneration(); } else { ChatView.sendMessage(); }
+      if (State.streaming) { ChatView.stopGeneration(); }
+      else if (State.dispatching) { ChatView.cancelDispatch(); }
+      else { ChatView.sendMessage(); }
     });
   },
 
@@ -142,7 +144,9 @@ const InteractionBindings = {
       const len = input.value.length;
       const hasContent = len > 0 || AttachmentBar.pendingAttachments.length > 0;
       const isStreaming = State.streaming;
-      if (sendBtn) sendBtn.disabled = !hasContent && !isStreaming;
+      const isDispatching = State.dispatching;
+      // dispatching/streaming 期间按钮必须可点击（cancel/stop），不看输入内容
+      if (sendBtn) sendBtn.disabled = !hasContent && !isStreaming && !isDispatching;
       if (charCount) {
         if (len > Constants.LIMIT.MAX_CHARS * Constants.LIMIT.CHAR_COUNT_SHOW_RATIO) {
           charCount.classList.add('visible');
@@ -158,7 +162,9 @@ const InteractionBindings = {
     self._addListener(input, 'keydown', function (e) {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        if (State.streaming) { ChatView.stopGeneration(); } else { ChatView.sendMessage(); }
+        if (State.streaming) { ChatView.stopGeneration(); }
+        else if (State.dispatching) { ChatView.cancelDispatch(); }
+        else { ChatView.sendMessage(); }
       }
       if (e.key === 'Escape') {
         if (State.activeModal) State.setState({ activeModal: null, editingAgent: null });
@@ -168,6 +174,7 @@ const InteractionBindings = {
     self._addListener(input, 'input', onAgentMentionInput);
     self._addListener(input, 'input', _updateInputState);
     self._onState('streaming', _updateInputState);
+    self._onState('dispatching', _updateInputState);
     _updateInputState();
   },
 

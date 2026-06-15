@@ -80,6 +80,7 @@ module.exports = {
     const getConfig = deps.getConfig;
     const refreshSetupMode = deps.refreshSetupMode;
     const stateDir = deps.stateDir;
+    const handleWorkspaceFile = deps.handleWorkspaceFile;
 
     function handleUpload(req, res) {
       collectBody(req, function (b, _raw, err) {
@@ -260,6 +261,7 @@ module.exports = {
       { method: 'GET',    pattern: /^\/api\/logs$/,                        handler: function (m, req, res) { debugTrace.handleGetLogs(req, res); } },
       { method: 'POST',   pattern: /^\/api\/logs\/clear$/,                 handler: function (m, req, res) { debugTrace.handleClearLogs(req, res); } },
       { method: 'POST',   pattern: /^\/api\/open-folder$/,                handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { _jsonRes(res, 413, {error:err.message}); return; } handleOpenFolder(b, res); }); } },
+      { method: 'GET',    pattern: /^\/api\/file$/,                        handler: function (m, req, res) { handleWorkspaceFile(req, res); } },
     ];
 
     function handleOpenFolder(body, res) {

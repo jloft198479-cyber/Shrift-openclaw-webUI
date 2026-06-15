@@ -164,81 +164,117 @@ var AgentModal = {
       + '  <span class="md-sep"></span>'
       + '  <button class="md-btn" data-cmd="code" title="代码">⟨⟩</button>'
       + '  <button class="md-btn" data-cmd="link" title="链接">🔗</button>'
+      + '  <span class="md-sep"></span>'
+      + '  <button class="md-btn md-btn-toggle" data-cmd="preview" title="预览">👁</button>'
       + '</div>'
-      + '<div class="md-content" contenteditable="true" data-placeholder="' + escapeHtml(placeholder) + '">'
+      + '<div class="md-panels">'
+      + '  <textarea id="' + id + '" class="md-source" placeholder="' + escapeHtml(placeholder) + '">' + escapeHtml(markdown) + '</textarea>'
+      + '  <div class="md-preview" style="display:none"></div>'
       + '</div>'
-      + '<textarea id="' + id + '" style="display:none">' + escapeHtml(markdown) + '</textarea>'
       + '</div>';
     return html;
   },
 
   _initEditor: function(editorEl) {
-    var textarea = editorEl.querySelector('textarea');
-    var content = editorEl.querySelector('.md-content');
-    var md = textarea.value || '';
-    if (md && typeof marked !== 'undefined') {
-      content.innerHTML = marked.parse(md);
-      content.querySelectorAll('strong').forEach(function(el) {
-        var text = el.textContent.trim();
-        var isTagLabel = Object.values(PROMPT_TEMPLATES).indexOf(text) >= 0
-          || Object.values(TOOLS_TEMPLATES).indexOf(text) >= 0;
-        if (isTagLabel) {
-          var span = document.createElement('span');
-          span.className = 'md-inline-tag';
-          span.contentEditable = 'false';
-          span.textContent = text;
-          el.replaceWith(span);
+    // Source-code editor: textarea is the single source of truth, no HTML↔MD round-trip
+    var textarea = editorEl.querySelector('.md-source');
+    var preview = editorEl.querySelector('.md-preview');
+    var previewBtn = editorEl.querySelector('[data-cmd="preview"]');
+    var isPreview = false;
+
+    if (previewBtn) {
+      previewBtn.addEventListener('click', function() {
+        isPreview = !isPreview;
+        if (isPreview) {
+          // Render preview
+          var md = textarea.value || '';
+          if (typeof marked !== 'undefined') {
+            preview.innerHTML = marked.parse(md);
+          } else {
+            preview.textContent = md;
+          }
+          textarea.style.display = 'none';
+          preview.style.display = '';
+          previewBtn.classList.add('active');
+        } else {
+          textarea.style.display = '';
+          preview.style.display = 'none';
+          previewBtn.classList.remove('active');
         }
       });
-    } else if (md) {
-      content.textContent = md;
     }
-    content.addEventListener('input', function() {
-      if (typeof TurndownService !== 'undefined') {
-        var td = new TurndownService({ headingStyle: 'atx', bulletListMarker: '-' });
-        td.addRule('inlineTag', {
-          filter: function(node) { return node.nodeName === 'SPAN' && node.className === 'md-inline-tag'; },
-          replacement: function(content) { return '**' + content + '**'; }
-        });
-        textarea.value = td.turndown(content.innerHTML);
-      } else {
-        textarea.value = content.innerText;
-      }
-    });
   },
 
-  _execEditorCmd: function(contentEl, cmd) {
-    contentEl.focus();
-    var sel = window.getSelection();
-    var range = sel.rangeCount > 0 ? sel.getRangeAt(0) : null;
+  _execEditorCmd: function(textarea, cmd) {
+    // Operate directly on textarea text — insert Markdown syntax markers
+    var start = textarea.selectionStart;
+    var end = textarea.selectionEnd;
+    var sel = textarea.value.substring(start, end);
+    var before = textarea.value.substring(0, start);
+    var after = textarea.value.substring(end);
+    var insert = '';
+    var cursorOffset = 0;
+
     switch (cmd) {
       case 'bold':
-        document.execCommand('bold', false, null);
+        insert = '**' + (sel || '粗体文字') + '**';
+        if (!sel) cursorOffset = 2; // cursor inside markers
         break;
       case 'italic':
-        document.execCommand('italic', false, null);
+        insert = '*' + (sel || '斜体文字') + '*';
+        if (!sel) cursorOffset = 1;
         break;
       case 'h2':
-        document.execCommand('formatBlock', false, '<h2>');
+        // Insert ## at line start
+        var lineStart = before.lastIndexOf('\n') + 1;
+        var linePrefix = before.substring(lineStart);
+        if (linePrefix.trim() === '' && sel === '') {
+          insert = '## ';
+          cursorOffset = 0;
+          before = before.substring(0, start); // keep position
+        } else {
+          before = before.substring(0, lineStart);
+          insert = '## ' + linePrefix + sel;
+          start = lineStart;
+        }
         break;
       case 'ul':
-        document.execCommand('insertUnorderedList', false, null);
+        insert = '\n- ' + (sel || '列表项');
+        if (!sel) cursorOffset = 3;
         break;
       case 'ol':
-        document.execCommand('insertOrderedList', false, null);
+        insert = '\n1. ' + (sel || '列表项');
+        if (!sel) cursorOffset = 4;
         break;
       case 'code':
-        var text = sel.toString();
-        if (text) {
-          document.execCommand('insertHTML', false, '<code>' + escapeHtml(text) + '</code>');
+        if (sel.indexOf('\n') >= 0) {
+          insert = '\n```\n' + sel + '\n```\n';
+        } else {
+          insert = '`' + (sel || '代码') + '`';
+          if (!sel) cursorOffset = 1;
         }
         break;
       case 'link':
-        var linkText = sel.toString() || '链接';
-        document.execCommand('insertHTML', false, '<a href="#">' + escapeHtml(linkText) + '</a>');
+        insert = '[' + (sel || '链接文字') + '](url)';
+        if (!sel) cursorOffset = 1;
         break;
+      default:
+        return;
     }
-    contentEl.dispatchEvent(new Event('input'));
+
+    textarea.value = before + insert + after;
+    textarea.focus();
+
+    // Position cursor
+    var newPos = start + insert.length - (sel ? 0 : cursorOffset);
+    if (cmd === 'h2' && !sel) {
+      newPos = before.length + insert.length;
+    }
+    textarea.setSelectionRange(
+      sel ? start : newPos,
+      sel ? start + insert.length : newPos
+    );
+    textarea.dispatchEvent(new Event('input'));
   },
 
   _renderForm: function(opts) {
@@ -443,9 +479,10 @@ var AgentModal = {
       var mdBtn = e.target.closest('.md-btn');
       if (mdBtn) {
         var cmd = mdBtn.dataset.cmd;
+        if (cmd === 'preview') return; // handled by _initEditor
         var editor = mdBtn.closest('.md-editor');
-        var contentEl = editor ? editor.querySelector('.md-content') : null;
-        if (contentEl) self._execEditorCmd(contentEl, cmd);
+        var textarea = editor ? editor.querySelector('.md-source') : null;
+        if (textarea) self._execEditorCmd(textarea, cmd);
         return;
       }
 
@@ -456,34 +493,20 @@ var AgentModal = {
         var tag = promptTag.dataset.tag;
         var tabPanel = promptTag.closest('.tab-panel');
         var editorEl = tabPanel ? tabPanel.querySelector('.md-editor') : null;
-        var contentEl = editorEl ? editorEl.querySelector('.md-content') : null;
-        var textarea = editorEl ? editorEl.querySelector('textarea') : null;
+        var textarea = editorEl ? editorEl.querySelector('.md-source') : null;
         var templates = tabPanel && tabPanel.dataset.panel === 'tools' ? TOOLS_TEMPLATES : PROMPT_TEMPLATES;
-        if (contentEl && textarea) {
+        if (textarea) {
           var tagLabel = templates[tag] || tag.replace(/^#/, '');
-          contentEl.focus();
-          var sel = window.getSelection();
-          if (sel.rangeCount > 0) {
-            var range = sel.getRangeAt(0);
-            range.deleteContents();
-            var tagNode = document.createElement('span');
-            tagNode.className = 'md-inline-tag';
-            tagNode.contentEditable = 'false';
-            tagNode.textContent = tagLabel;
-            var spaceNode = document.createTextNode('\u00A0');
-            var frag = document.createDocumentFragment();
-            frag.appendChild(tagNode);
-            frag.appendChild(spaceNode);
-            range.insertNode(frag);
-            range.setStartAfter(spaceNode);
-            range.collapse(true);
-            sel.removeAllRanges();
-            sel.addRange(range);
-          } else {
-            contentEl.insertAdjacentHTML('beforeend',
-              '<span class="md-inline-tag" contenteditable="false">' + escapeHtml(tagLabel) + '</span>&nbsp;');
-          }
-          contentEl.dispatchEvent(new Event('input'));
+          // Insert tag as Markdown bold heading at cursor
+          var start = textarea.selectionStart;
+          var before = textarea.value.substring(0, start);
+          var after = textarea.value.substring(textarea.selectionEnd);
+          var prefix = before.length > 0 && !before.endsWith('\n') ? '\n' : '';
+          var insert = prefix + '## **' + tagLabel + '**\n';
+          textarea.value = before + insert + after;
+          textarea.focus();
+          textarea.setSelectionRange(start + insert.length, start + insert.length);
+          textarea.dispatchEvent(new Event('input'));
         }
       }
     });

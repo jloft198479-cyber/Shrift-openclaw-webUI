@@ -96,9 +96,9 @@ const StreamRenderer = {
    */
   beginStreaming: function (cleanupFn) {
     if (State.streaming) { this.endStreaming(); }
-    if (ChatView._activeChatCleanup) {
-      ChatView._activeChatCleanup();
-      ChatView._activeChatCleanup = null;
+    if (ChatController._activeChatCleanup) {
+      ChatController._activeChatCleanup();
+      ChatController._activeChatCleanup = null;
     }
     State.setState({ streaming: true });
     this.showStopBtn();
@@ -128,7 +128,10 @@ const StreamRenderer = {
     }
 
     State.setState({ streaming: false });
-    this._resetSendBtn();
+    // dispatching 期间保留 cancel 按钮，不重置为 send
+    if (!State.dispatching) {
+      this._resetSendBtn();
+    }
 
     const thinkInd = document.getElementById('thinking-indicator');
     if (thinkInd) thinkInd.style.display = 'none';
@@ -171,15 +174,25 @@ const StreamRenderer = {
     btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
   },
 
+  /**
+   * dispatch 模式下显示取消按钮（send-btn 变为 × cancel 样式）
+   */
+  showCancelBtn: function () {
+    const btn = document.getElementById('send-btn');
+    if (!btn) return;
+    btn.disabled = false;
+    btn.classList.add('is-cancel');
+    btn.classList.remove('is-stop');
+    btn.setAttribute('aria-label', '取消调度');
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
+  },
+
   _resetSendBtn: function () {
     const btn = document.getElementById('send-btn');
     if (!btn) return;
-    if (State.dispatching) {
-      btn.disabled = true;
-      return;
-    }
     btn.disabled = false;
     btn.classList.remove('is-stop');
+    btn.classList.remove('is-cancel');
     btn.setAttribute('aria-label', '发送');
     btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>';
   },

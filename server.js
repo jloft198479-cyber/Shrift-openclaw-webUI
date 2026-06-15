@@ -199,7 +199,7 @@ let _configWatchTimer = null;
 if (OPENCLAW_CONFIG) {
 try {
   fs.watch(OPENCLAW_CONFIG, function (eventType) {
-    if (eventType !== 'change') return;
+    if (eventType !== 'change' && eventType !== 'rename') return;
     if (_configWatchTimer) return;
     _configWatchTimer = setTimeout(function () {
       _configWatchTimer = null;
@@ -298,6 +298,72 @@ function serveStatic(req, res) {
   });
 }
 
+/**
+ * 本地工作区文件代理 — 将 workspace 下的文件通过 HTTP 提供访问
+ * 路由：GET /api/file?path=<url-encoded-absolute-path>
+ * 安全：仅允许访问 agent workspace 目录和全局 skills 目录内的文件
+ */
+function handleWorkspaceFile(req, res) {
+  const parsed = new URL(req.url, 'http://localhost');
+  const filePath = parsed.searchParams.get('path');
+  if (!filePath) { res.writeHead(400); res.end('Missing path parameter'); return; }
+
+  const decoded = decodeURIComponent(filePath);
+  const resolved = path.resolve(decoded);
+
+  // 构建白名单：所有 agent workspace + 全局 skills 目录
+  const allowed = _getWorkspaceAllowedDirs();
+  let isAllowed = false;
+  for (let i = 0; i < allowed.length; i++) {
+    if (resolved.indexOf(allowed[i]) === 0) { isAllowed = true; break; }
+  }
+  if (!isAllowed) { res.writeHead(403); res.end('Forbidden: path outside workspace'); return; }
+
+  const ext = path.extname(resolved).toLowerCase();
+  const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+  fs.readFile(resolved, function (err, data) {
+    if (err) {
+      res.writeHead(err.code === 'ENOENT' ? 404 : 500);
+      res.end(err.code === 'ENOENT' ? 'File not found' : 'Internal error');
+      return;
+    }
+    res.writeHead(200, {
+      'Content-Type': contentType,
+      'Cache-Control': 'public, max-age=3600',
+    });
+    res.end(data);
+  });
+}
+
+var _wsAllowedDirsCache = null;
+var _wsAllowedDirsCacheTime = 0;
+
+function _getWorkspaceAllowedDirs() {
+  // 缓存 30 秒，避免每次请求都读配置
+  var now = Date.now();
+  if (_wsAllowedDirsCache && (now - _wsAllowedDirsCacheTime) < 30000) return _wsAllowedDirsCache;
+
+  var dirs = [];
+  var data = store.readConfig();
+  if (data && data.agents && data.agents.list) {
+    var list = data.agents.list;
+    for (var i = 0; i < list.length; i++) {
+      var ws = store.resolveHome(list[i].workspace || '');
+      if (ws) dirs.push(path.resolve(ws));
+    }
+  }
+  // 全局 skills 目录
+  var gsDir = store._resolveGlobalSkillsDir();
+  if (gsDir) dirs.push(path.resolve(gsDir));
+  // uploads 目录
+  var dataDir = store.getDataDir();
+  if (dataDir) dirs.push(path.resolve(path.join(dataDir, 'uploads')));
+
+  _wsAllowedDirsCache = dirs;
+  _wsAllowedDirsCacheTime = now;
+  return dirs;
+}
+
 function serveStaticWithOverride(req, res, overridePath) {
   const fullPath = path.join(WEB_DIR, overridePath);
   const ext = path.extname(fullPath).toLowerCase();
@@ -324,6 +390,7 @@ const routeHandlers = routes.init({
   getConfig: function () { return config; },
   refreshSetupMode: _refreshSetupMode,
   stateDir: store.getDataDir(),
+  handleWorkspaceFile: handleWorkspaceFile,
 });
 const ROUTES = routeHandlers.routes;
 

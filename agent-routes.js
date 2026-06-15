@@ -168,9 +168,9 @@ function createAgent(body, res) {
   if (fs.existsSync(wsPath)) { _jsonErr(res, 409, '工作目录已存在: ' + wsName); return; }
   fs.mkdirSync(wsPath, { recursive: true });
   const prompt = body.prompt || '';
-  if (prompt) store.writeFile(path.join(wsPath, 'AGENTS.md'), prompt);
+  store.writeFile(path.join(wsPath, 'AGENTS.md'), prompt);
   const toolsMd = body.toolsMd || '';
-  if (toolsMd) store.writeFile(path.join(wsPath, 'TOOLS.md'), toolsMd);
+  store.writeFile(path.join(wsPath, 'TOOLS.md'), toolsMd);
   const avatar = body.avatar || '';
   const desc = body.description || '';
   const newAgent = { id: id, name: body.name, workspace: wsRelative, identity: { emoji: avatar }, description: desc };
@@ -207,7 +207,7 @@ function updateAgent(agentId, body, res) {
       }
       if (Object.hasOwn(body, 'skills')) agentList[i].skills = body.skills;
       const ws = store.resolveHome(agentList[i].workspace || '');
-      if (body.prompt && ws) store.writeFile(path.join(ws, 'AGENTS.md'), body.prompt);
+      if (Object.hasOwn(body, 'prompt') && ws) store.writeFile(path.join(ws, 'AGENTS.md'), body.prompt || '');
       // 工作目录名与名称不一致时自动重命名
       if (Object.hasOwn(body, 'name') && ws && fs.existsSync(ws)) {
         const safeName = _sanitizeFolderName(body.name);

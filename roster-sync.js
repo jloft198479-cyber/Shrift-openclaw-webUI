@@ -55,24 +55,28 @@ function _syncSkillLinks(skillIds, workspace) {
         if (!fs.existsSync(resolved)) {
           // Broken link → remove
           try { fs.unlinkSync(managed[name]); } catch (e) {}
-        } else if (skillIds.indexOf(name) < 0 && resolved.indexOf(globalSkillsDir) < 0) {
-          // Not in skillIds AND not pointing to global skills → remove
+        } else if (skillIds.indexOf(name) < 0) {
+          // Not in skillIds → remove (regardless of link target)
           try { fs.rmSync(managed[name], { recursive: true, force: true }); } catch (e) {}
         }
-        // Otherwise: valid link (in skillIds or pointing to global skills) → keep
+        // Otherwise: in skillIds → keep
       } else if (stat.isDirectory()) {
-        // Orphan copy matching a global skill → always replace with junction
-        // (regardless of skillIds, so even agents without explicit skills get corrected)
-        const globalSrc = path.join(globalSkillsDir, name);
-        try { fs.rmSync(managed[name], { recursive: true, force: true }); } catch (e) {}
-        try {
-          if (process.platform === 'win32') {
-            fs.symlinkSync(globalSrc, managed[name], 'junction');
-          } else {
-            fs.symlinkSync(globalSrc, managed[name], 'dir');
+        if (skillIds.indexOf(name) < 0) {
+          // Orphan directory not in skillIds → remove
+          try { fs.rmSync(managed[name], { recursive: true, force: true }); } catch (e) {}
+        } else {
+          // Orphan copy matching a configured skill → replace with junction
+          const globalSrc = path.join(globalSkillsDir, name);
+          try { fs.rmSync(managed[name], { recursive: true, force: true }); } catch (e) {}
+          try {
+            if (process.platform === 'win32') {
+              fs.symlinkSync(globalSrc, managed[name], 'junction');
+            } else {
+              fs.symlinkSync(globalSrc, managed[name], 'dir');
+            }
+          } catch (e) {
+            console.error('[Roster] Failed to replace orphan copy with junction for "' + name + '": ' + e.message);
           }
-        } catch (e) {
-          console.error('[Roster] Failed to replace orphan copy with junction for "' + name + '": ' + e.message);
         }
       }
     } catch (e) {}
@@ -160,7 +164,8 @@ function _buildTeamSection(agentId, agentList, allowedIds) {
       }
     }
     const short = desc.length > 30 ? desc.slice(0, 30) + '…' : desc;
-    lines.push('- ' + name + (short ? ' — ' + short : ''));
+    const idTag = (name !== a.id) ? ' (' + a.id + ')' : '';
+    lines.push('- ' + name + idTag + (short ? ' — ' + short : ''));
   }
   return lines.join('\n');
 }
@@ -170,7 +175,7 @@ function _buildSkillSection(skillIds) {
   const globalSkills = store.scanGlobalSkills();
   const extraSkills = store.scanExtraDirsSkills();
   const allSkills = globalSkills.concat(extraSkills);
-  const lines = ['## 技能', '', 'Skills are **primary tools** — use them directly when the task matches.', '', 'Rules:', '- When a task matches a skill, use it as the **first choice**', '- Skills are invoked via the `exec` tool, e.g. `exec python skills/xxx/xxx.py ...`', '- **NEVER** say "I cannot do X" when you have a skill that can do it', ''];
+  const lines = ['## 已绑定技能', '', 'Skills are **primary tools** — use them directly when the task matches.', '', 'Rules:', '- When a task matches a skill, use it as the **first choice**', '- Skills are invoked via the `exec` tool, e.g. `exec python skills/xxx/xxx.py ...`', '- **NEVER** say "I cannot do X" when you have a skill that can do it', ''];
   for (let i = 0; i < skillIds.length; i++) {
     const sid = skillIds[i];
     const found = allSkills.find(function (s) { return s.id === sid; });
@@ -198,19 +203,6 @@ function _buildSkillSection(skillIds) {
     }
   }
   return lines.join('\n');
-}
-
-function _buildSystemSection(agentId, agentList, skillIds) {
-  const parts = [];
-  // 只展示 allowAgents 中的成员，与 Gateway spawn 权限保持一致
-  const target = agentList.find(function (a) { return a.id === agentId; });
-  const allowedIds = (target && target.subagents && target.subagents.allowAgents) ? target.subagents.allowAgents : null;
-  const teamSection = _buildTeamSection(agentId, agentList, allowedIds);
-  if (teamSection) parts.push(teamSection);
-  const skillSection = _buildSkillSection(skillIds);
-  if (skillSection) parts.push(skillSection);
-  if (parts.length === 0) return '';
-  return _SYS_SECTION_START + '\n' + parts.join('\n\n') + '\n' + _SYS_SECTION_END;
 }
 
 function _stripSystemSection(content) {
@@ -241,10 +233,21 @@ function _syncToolsMd(agentId, agentList, skillIds, workspace) {
   const toolsPath = path.join(workspace, 'TOOLS.md');
   const existing = store.readFile(toolsPath) || '';
   const userPart = _stripSystemSection(existing).trim();
-  const systemPart = _buildSystemSection(agentId, agentList, skillIds);
+
+  // Build team and skill sections separately
+  const target = agentList.find(function (a) { return a.id === agentId; });
+  const allowedIds = (target && target.subagents && target.subagents.allowAgents) ? target.subagents.allowAgents : null;
+  const teamSection = _buildTeamSection(agentId, agentList, allowedIds);
+  const skillSection = _buildSkillSection(skillIds);
+
+  const parts = [];
+  if (teamSection) parts.push(teamSection);
+  if (skillSection) parts.push(skillSection);
+
   let content = userPart;
-  if (systemPart) {
-    content = content + '\n\n' + systemPart;
+  if (parts.length > 0) {
+    const systemSection = _SYS_SECTION_START + '\n' + parts.join('\n\n') + '\n' + _SYS_SECTION_END;
+    content = content + '\n\n' + systemSection;
   }
   content = content.trim() + '\n';
   store.writeFile(toolsPath, content);
@@ -341,12 +344,55 @@ function syncSubAgentRoster(agentId, agentList) {
   return true;
 }
 
+/**
+ * 校验所有 Agent 的 skills 引用是否指向实际存在的技能目录。
+ * 移除配置中引用了但磁盘上不存在的"幽灵"技能 ID。
+ * 返回值：是否有修改（true = 需要 writeConfig）
+ */
+function _validateSkillRefs(agentList) {
+  // 收集磁盘上实际存在的技能 ID
+  var validIds = {};
+  var globalSkills = store.scanGlobalSkills();
+  var extraSkills = store.scanExtraDirsSkills();
+  var i;
+  for (i = 0; i < globalSkills.length; i++) validIds[globalSkills[i].id] = true;
+  for (i = 0; i < extraSkills.length; i++) validIds[extraSkills[i].id] = true;
+
+  var changed = false;
+  for (i = 0; i < agentList.length; i++) {
+    var agent = agentList[i];
+    if (!agent.skills || !Array.isArray(agent.skills)) continue;
+
+    var phantoms = [];
+    var valid = [];
+    for (var j = 0; j < agent.skills.length; j++) {
+      if (validIds[agent.skills[j]]) {
+        valid.push(agent.skills[j]);
+      } else {
+        phantoms.push(agent.skills[j]);
+      }
+    }
+
+    if (phantoms.length > 0) {
+      console.warn('[Roster] Removed ' + phantoms.length + ' phantom skill ref(s) from agent "' + agent.id + '": ' + phantoms.join(', '));
+      agent.skills = valid;
+      changed = true;
+    }
+  }
+  return changed;
+}
+
 function syncAllRosters() {
   const data = store.readConfig();
   if (!data) return;
   const list = (data.agents && data.agents.list) || [];
   if (!Array.isArray(list)) return;
-  if (_validateAllowAgents(list)) {
+
+  var configChanged = false;
+  if (_validateAllowAgents(list)) configChanged = true;
+  if (_validateSkillRefs(list)) configChanged = true;
+
+  if (configChanged) {
     try { store.writeConfig(data); } catch (e) { console.error('[Roster] writeConfig failed:', e.message); }
   }
   syncTeamRoster();
