@@ -95,7 +95,7 @@ const ChatController = {
           st.began = true;
           st.preparing = false;
           st.text += text;
-          if (st.text.indexOf('NO_REPLY') >= 0) {
+          if (st.text.trim() === 'NO_REPLY') {
             st.text = '';
             return;
           }
@@ -132,12 +132,13 @@ const ChatController = {
           self._lastStreamedText = finalText || '';
           if (self._spawnDetected) {
             self._spawnDetected = false;
+            self._lastSpawnTime = Date.now();
             State.setState({ dispatching: true });
             self._updateDispatchStatusBar();
             self._dispatchSafetyTimer = setTimeout(function () {
               if (State.dispatching) {
                 DebugTrace.log('dispatch-safety-timeout', { active: self._activeSubagents.size, completed: self._completedSubagents.size });
-                if (self._activeSubagents.size > 0 && self._completedSubagents.size >= self._activeSubagents.size) {
+                if (self._completedSubagents.size >= self._activeSubagents.size) {
                   self._checkDispatchComplete();
                 }
               }
@@ -334,7 +335,11 @@ const ChatController = {
 
   _checkDispatchComplete: function () {
     if (!State.dispatching) return;
-    if (this._completedSubagents.size === 0) return;
+    if (this._completedSubagents.size === 0) {
+      // 没有任何子 Agent 事件到达时，如果 spawn 已安静超过 10s，放行到清理逻辑
+      const noEventQuiet = this._lastSpawnTime > 0 && (Date.now() - this._lastSpawnTime > 10000);
+      if (!noEventQuiet) return;
+    }
 
     // 判定完成条件：
     // 1. 所有已知子 Agent 都完成了（completed >= active）
@@ -403,6 +408,7 @@ const ChatController = {
     this._announcedOffsets.clear();
     this._progressElements = {};
     this._spawnDetected = false;
+    this._lastSpawnTime = 0;
     this._announceQueue = [];
     this._lastStreamedText = '';
     this._hideDispatchStatusBar();

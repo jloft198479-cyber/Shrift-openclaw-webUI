@@ -165,8 +165,8 @@ function _doRead(sessionKey, frontendSessionId) {
         break;
       }
     }
-    // main session 的 announce 不应带子 agent 标签
-    if (sessionKey && sessionKey.indexOf(':webui:') >= 0 && sessionKey.indexOf(':subagent:') < 0) {
+    // main session 的 announce 不应带子 agent 标签（只匹配 agent:main:，不影响 direct 模式如 agent:ppt:）
+    if (sessionKey && sessionKey.indexOf('agent:main:') === 0) {
       broadcastAgentId = '';
     }
     debugTrace.trace('announce-result-broadcast', { agentId: broadcastAgentId, sessionId: frontendSessionId, msgCount: newMessages.length, lastMsgPreview: (newMessages[newMessages.length - 1].content || '').substring(0, 100) });
