@@ -403,6 +403,10 @@ const ChatController = {
       clearTimeout(this._dispatchLongTimer);
       this._dispatchLongTimer = null;
     }
+    if (this._dispatchCleanupTimer) { // P1-4: 清理 2s 延时 timer，避免旧 timer 清空新 dispatch 状态
+      clearTimeout(this._dispatchCleanupTimer);
+      this._dispatchCleanupTimer = null;
+    }
     this._activeSubagents.clear();
     this._completedSubagents.clear();
     this._announcedOffsets.clear();

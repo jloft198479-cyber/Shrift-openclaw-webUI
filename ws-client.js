@@ -129,6 +129,7 @@ function createWsClient(gwUrl, gwToken) {
       if (data.type === 'res' && pendingRequests[data.id]) {
         const pr = pendingRequests[data.id];
         delete pendingRequests[data.id];
+        if (pr.timer) clearTimeout(pr.timer); // B-1: 清 timer，避免空跑定时器泄漏
         if (data.ok) {
           pr.resolve(data.payload);
         } else {
