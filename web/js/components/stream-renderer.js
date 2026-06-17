@@ -122,6 +122,11 @@ const StreamRenderer = {
       this._rafId = null;
     }
 
+    if (this._debounceTimer) {
+      clearTimeout(this._debounceTimer);
+      this._debounceTimer = null;
+    }
+
     if (!skipCleanup && this._pendingCleanup) {
       this._pendingCleanup();
       this._pendingCleanup = null;

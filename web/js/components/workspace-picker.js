@@ -24,6 +24,7 @@ var WorkspacePicker = {
 
   hide: function () {
     if (this._panel) {
+      document.removeEventListener('click', this._outsideClickHandler);
       this._panel.remove();
       this._panel = null;
     }

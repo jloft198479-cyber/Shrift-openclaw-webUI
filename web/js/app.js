@@ -15,6 +15,7 @@ async function init() {
       const s = document.createElement('script');
       s.src = '/js/lib/marked.min.js';
       s.onload = resolve;
+      s.onerror = resolve; // 加载失败也 resolve，render.js 有 marked undefined 降级分支
       document.head.appendChild(s);
     });
   }

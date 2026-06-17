@@ -76,7 +76,10 @@ var AgentModal = {
 
     var self = this;
     Api.fetchAgentDetail(agentId).then(function(detail) {
+      // 世界校验：异步回调时模态框可能已关闭或切换到其他 agent
+      if (State.activeModal !== 'edit-agent' || State.editingAgent !== agentId) return;
       Api._fetch('/api/agents/' + encodeURIComponent(agentId) + '/tools-md').then(function(td) {
+        if (State.activeModal !== 'edit-agent' || State.editingAgent !== agentId) return;
         var toolsMd = td ? td.content || '' : '';
         var sysPart = '';
         var userPart = toolsMd;
@@ -90,6 +93,7 @@ var AgentModal = {
         }
         self._renderEditForm(agent, agentId, detail, userPart, sysPart);
       }).catch(function() {
+        if (State.activeModal !== 'edit-agent' || State.editingAgent !== agentId) return;
         self._renderEditForm(agent, agentId, detail, '', '');
       });
     }).catch(function(err) {

@@ -116,12 +116,15 @@ const InteractionBindings = {
       fileInput.type = 'file';
       fileInput.multiple = true;
       fileInput.style.display = 'none';
-      self._addListener(fileInput, 'change', function () {
+      // 一次性 input 不登记到 _handlers，回调内自动清理
+      var changeHandler = function () {
         if (fileInput.files.length > 0) {
           ChatView.handleFiles(Array.from(fileInput.files));
         }
+        fileInput.removeEventListener('change', changeHandler);
         fileInput.remove();
-      });
+      };
+      fileInput.addEventListener('change', changeHandler);
       document.body.appendChild(fileInput);
       fileInput.click();
     });
@@ -284,10 +287,11 @@ const InteractionBindings = {
       const sec = document.getElementById('agent-section');
       _startH = sec ? sec.offsetHeight : Constants.SIZE.AGENT_DEFAULT_HEIGHT;
       document.body.classList.add('resizing-agent-section');
-      self._addListener(document, 'mousemove', _onResizeMove);
-      self._addListener(document, 'mouseup', _onResizeEnd);
-      self._addListener(document, 'touchmove', _onResizeMove, { passive: false });
-      self._addListener(document, 'touchend', _onResizeEnd);
+      // resize 临时监听不走 _addListener，避免 _handlers 记录残留
+      document.addEventListener('mousemove', _onResizeMove);
+      document.addEventListener('mouseup', _onResizeEnd);
+      document.addEventListener('touchmove', _onResizeMove, { passive: false });
+      document.addEventListener('touchend', _onResizeEnd);
     }
 
     function _onResizeMove(e) {
