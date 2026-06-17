@@ -105,10 +105,9 @@ function _scheduleRead(sessionKey, frontendSessionId) {
   // 按 sessionKey 去重入队（同 key 更新 frontendSessionId）
   _pendingReads.set(sessionKey, frontendSessionId);
   if (_retryTimer) return; // 已有定时器在跑，入队后等它处理
-  _retryCount = 0;
   _retryTimer = setTimeout(function () {
     _retryTimer = null;
-    _processQueue();
+    _processQueue(); // _processQueue 内会重置 _retryCount
   }, INITIAL_DELAY_MS);
 }
 
@@ -140,12 +139,13 @@ function _doRead(sessionKey, frontendSessionId) {
   try {
     const stat = fs.statSync(targetFile);
     statSize = stat.size;
-    const currentOffset = _fileOffsets[targetFile] || 0;
+    let currentOffset = _fileOffsets[targetFile] || 0;
     readOffset = currentOffset; // 记录本次读取的起始偏移量，用于前端去重
     // 文件被截断/替换时，重置偏移量从头读取
     if (currentOffset > 0 && stat.size < currentOffset) {
-      _log('fileTruncated', targetFile + ' was ' + currentOffset + ' now ' + stat.size + ', resetting offset');
+      console.log('[Sync] fileTruncated: ' + targetFile + ' was ' + currentOffset + ' now ' + stat.size + ', resetting offset');
       _fileOffsets[targetFile] = 0;
+      currentOffset = 0;
       readOffset = 0;
     }
     if (stat.size <= (readOffset || 0)) {
@@ -204,8 +204,7 @@ function _maybeRetry(sessionKey, frontendSessionId) {
     }, RETRY_DELAY_MS);
   } else {
     // retry 超限，继续处理队列中的其他 sessionKey
-    _retryCount = 0;
-    _processQueue();
+    _processQueue(); // _processQueue 内会重置 _retryCount
   }
 }
 
