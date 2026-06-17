@@ -27,7 +27,7 @@ let _broadcastSSE = null;
 let _fileOffsets = {};
 let _retryTimer = null;
 let _retryCount = 0;
-let _pendingSessionKey = '';
+let _pendingReads = new Map(); // key: sessionKey, value: frontendSessionId（按 key 去重入队）
 const MAX_RETRIES = 2;
 const RETRY_DELAY_MS = 1000;
 const INITIAL_DELAY_MS = 500;
@@ -102,34 +102,44 @@ function onSubagentGatewayEvent(data) {
 }
 
 function _scheduleRead(sessionKey, frontendSessionId) {
-  if (_retryTimer) {
-    // 已有 retry 在进行，更新待处理的 sessionKey 而非丢弃
-    _pendingSessionKey = sessionKey;
-    return;
-  }
+  // 按 sessionKey 去重入队（同 key 更新 frontendSessionId）
+  _pendingReads.set(sessionKey, frontendSessionId);
+  if (_retryTimer) return; // 已有定时器在跑，入队后等它处理
   _retryCount = 0;
-  _pendingSessionKey = sessionKey;
   _retryTimer = setTimeout(function () {
     _retryTimer = null;
-    _doRead(_pendingSessionKey, frontendSessionId);
+    _processQueue();
   }, INITIAL_DELAY_MS);
+}
+
+function _processQueue() {
+  if (_pendingReads.size === 0) return;
+  _retryCount = 0; // 每个 sessionKey 重置 retry 计数
+  const entry = _pendingReads.entries().next();
+  const sessionKey = entry.value[0];
+  const frontendSessionId = entry.value[1];
+  _pendingReads.delete(sessionKey);
+  _doRead(sessionKey, frontendSessionId);
 }
 
 function _doRead(sessionKey, frontendSessionId) {
   const targetFile = _findTargetFile(sessionKey);
-  if (!targetFile) return;
+  if (!targetFile) { _processQueue(); return; }
 
   if (!(targetFile in _fileOffsets)) {
     try {
       _fileOffsets[targetFile] = fs.statSync(targetFile).size;
     } catch (e) { _fileOffsets[targetFile] = 0; }
+    _processQueue();
     return;
   }
 
   let newMessages = [];
   let readOffset = 0;
+  let statSize = 0;
   try {
     const stat = fs.statSync(targetFile);
+    statSize = stat.size;
     const currentOffset = _fileOffsets[targetFile] || 0;
     readOffset = currentOffset; // 记录本次读取的起始偏移量，用于前端去重
     // 文件被截断/替换时，重置偏移量从头读取
@@ -151,13 +161,12 @@ function _doRead(sessionKey, frontendSessionId) {
     } finally {
       fs.closeSync(fd);
     }
-    _fileOffsets[targetFile] = stat.size;
+    // 不立即推进 offset，等 broadcast 成功后再推进（P0-6：无客户端时不推进，等重连重读）
     newMessages = _parseAssistantMessages(buf.toString('utf8')).messages;
-  } catch (e) { _logError('read', e); }
+  } catch (e) { _logError('read', e); _processQueue(); return; }
 
   if (newMessages.length > 0) {
     // 从消息中提取 agentId（每条消息自带，不再依赖全局变量）
-    // 如果消息有 agentId，用最后一条的；否则回退到 _lastAgentId（兼容旧逻辑）
     let broadcastAgentId = '';
     for (let mi = newMessages.length - 1; mi >= 0; mi--) {
       if (newMessages[mi].agentId) {
@@ -165,15 +174,23 @@ function _doRead(sessionKey, frontendSessionId) {
         break;
       }
     }
-    // main session 的 announce 不应带子 agent 标签（只匹配 agent:main:，不影响 direct 模式如 agent:ppt:）
+    // main session 的 announce 不应带子 agent 标签
     if (sessionKey && sessionKey.indexOf('agent:main:') === 0) {
       broadcastAgentId = '';
     }
     debugTrace.trace('announce-result-broadcast', { agentId: broadcastAgentId, sessionId: frontendSessionId, msgCount: newMessages.length, lastMsgPreview: (newMessages[newMessages.length - 1].content || '').substring(0, 100) });
+    let delivered = false;
     if (_broadcastSSE) {
-      _broadcastSSE({ type: 'announce-result', messages: newMessages, agentId: broadcastAgentId, sessionId: frontendSessionId, offset: readOffset });
+      delivered = _broadcastSSE({ type: 'announce-result', messages: newMessages, agentId: broadcastAgentId, sessionId: frontendSessionId, offset: readOffset });
     }
+    if (delivered) {
+      _fileOffsets[targetFile] = statSize; // broadcast 成功，推进 offset
+    }
+    // 无论是否 delivered，都继续处理队列（delivered=false 时 offset 不推进，等重连重读，前端靠 _announcedOffsets 去重）
+    _processQueue();
   } else {
+    // 没有新 assistant 消息，推进 offset（跳过非 assistant 内容），避免反复读取
+    _fileOffsets[targetFile] = statSize;
     _maybeRetry(sessionKey, frontendSessionId);
   }
 }
@@ -185,6 +202,10 @@ function _maybeRetry(sessionKey, frontendSessionId) {
       _retryTimer = null;
       _doRead(sessionKey, frontendSessionId);
     }, RETRY_DELAY_MS);
+  } else {
+    // retry 超限，继续处理队列中的其他 sessionKey
+    _retryCount = 0;
+    _processQueue();
   }
 }
 
@@ -193,6 +214,7 @@ function stopSync() {
     clearTimeout(_retryTimer);
     _retryTimer = null;
   }
+  _pendingReads.clear();
   _fileOffsets = {};
   _retryCount = 0;
   console.log('[Sync] Stopped');

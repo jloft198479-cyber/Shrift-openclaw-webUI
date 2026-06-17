@@ -191,7 +191,7 @@ try {
   console.warn('[WS] WebSocket client not available:', e.message);
 }
 
-sessionSync.init(function (payload) { sseManager.broadcast(payload); });
+sessionSync.init(function (payload) { return sseManager.broadcast(payload); });
 
 // ── 配置文件监听 ──────────────────────────────────────
 

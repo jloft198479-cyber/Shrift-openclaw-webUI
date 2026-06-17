@@ -150,18 +150,27 @@ const SessionManager = {
     document.getElementById('sidebar-overlay')?.classList.remove('open');
   },
 
+  _beforeSwitch: function () {
+    // 会话切换前的统一清理：停止流式 + 清除调度状态 + 隐藏加载指示
+    StreamRenderer.endStreaming();
+    if (typeof ChatController !== 'undefined' && ChatController._clearDispatchState) {
+      ChatController._clearDispatchState();
+    }
+    document.getElementById('thinking-indicator').style.display = 'none';
+  },
+
   createSession: function () {
     SessionManager.closeSidebar();
     localStorage.removeItem('lastSessionId');
-    StreamRenderer.endStreaming();
+    SessionManager._beforeSwitch();
     State.setState({ currentSessionId: null, currentAgent: '', interactionMode: 'dispatch', messages: [] });
     ChatView.clearMessages();
     ChatView.showWelcome();
-    document.getElementById('thinking-indicator').style.display = 'none';
     document.getElementById('input')?.focus();
   },
 
   exitAgentMode: function () {
+    SessionManager._beforeSwitch();
     State.setState({ currentAgent: '', interactionMode: 'dispatch' });
     const sessions = State.sessions || [];
     if (sessions.length > 0 && sessions[0] && sessions[0].id) {
@@ -186,14 +195,14 @@ const SessionManager = {
 
   _renderSession: function (session) {
     if (!session) {
+      SessionManager._beforeSwitch();
       localStorage.removeItem('lastSessionId');
       ChatView.showWelcome();
       return;
     }
 
-    StreamRenderer.endStreaming();
+    SessionManager._beforeSwitch();
     State.setState({ currentSessionId: session.id, currentAgent: '', interactionMode: 'dispatch' });
-    document.getElementById('thinking-indicator').style.display = 'none';
 
     ChatView.clearMessages();
     ChatView.hideWelcome();

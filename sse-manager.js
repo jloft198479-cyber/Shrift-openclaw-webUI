@@ -39,6 +39,7 @@ const SseManager = {
   },
 
   broadcast(payload) {
+    if (this.clients.length === 0) return false;
     const eventType = payload.type || 'message';
     const data = 'event: ' + eventType + '\ndata: ' + JSON.stringify(payload) + '\n\n';
     const dead = [];
@@ -52,6 +53,7 @@ const SseManager = {
     for (let j = dead.length - 1; j >= 0; j--) {
       this.clients.splice(dead[j], 1);
     }
+    return true;
   },
 
   closeAll() {
