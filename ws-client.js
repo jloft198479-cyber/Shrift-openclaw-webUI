@@ -30,14 +30,15 @@ function createWsClient(gwUrl, gwToken) {
         return;
       }
       const id = String(++msgId);
-      pendingRequests[id] = { resolve: resolve, reject: reject };
-      ws.send(JSON.stringify({ type: 'req', id: id, method: method, params: params }));
-      setTimeout(function () {
+      // P2-3: 存 timer id，resolve/reject 时 clearTimeout，避免 timer 泄漏
+      const timer = setTimeout(function () {
         if (pendingRequests[id]) {
           delete pendingRequests[id];
           reject(new Error('Request timeout: ' + method));
         }
       }, timeoutMs || 30000);
+      pendingRequests[id] = { resolve: resolve, reject: reject, timer: timer };
+      ws.send(JSON.stringify({ type: 'req', id: id, method: method, params: params }));
     });
   }
 
@@ -155,6 +156,13 @@ function createWsClient(gwUrl, gwToken) {
       handshakeDone = false;
       stopPing();
       _stopSessionPolling();
+      // P2-3: 断连时清空所有 pending 请求，避免等满 timeout
+      for (const id in pendingRequests) {
+        const pr = pendingRequests[id];
+        if (pr.timer) clearTimeout(pr.timer);
+        pr.reject(new Error('WS disconnected'));
+      }
+      Object.keys(pendingRequests).forEach(function (id) { delete pendingRequests[id]; });
       emitter.emit('disconnected', { code: code });
       scheduleReconnect();
     });

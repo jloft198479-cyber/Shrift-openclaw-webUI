@@ -194,6 +194,8 @@ function updateAgent(agentId, body, res) {
   let agentList = (data.agents && data.agents.list) || data.agents || [];
   if (!Array.isArray(agentList)) agentList = [];
   let found = false;
+  // P0-5: rename 回滚信息——先写配置，成功后再 rename 目录，rename 失败则回滚配置
+  let renameInfo = null;
   for (let i = 0; i < agentList.length; i++) {
     if (agentList[i].id === agentId) {
       found = true;
@@ -220,13 +222,10 @@ function updateAgent(agentId, body, res) {
             if (fs.existsSync(newWsPath)) {
               _jsonErr(res, 409, '工作目录已存在: ' + expectedDirName); return;
             }
-            try {
-              fs.renameSync(ws, newWsPath);
-              agentList[i].workspace = agentList[i].workspace.replace(currentDirName, expectedDirName);
-            } catch (e) {
-              console.error('[Agent] Rename workspace failed:', e.message);
-              _jsonErr(res, 500, '重命名工作目录失败: ' + e.message); return;
-            }
+            // P0-5: 先更新内存中的 workspace 路径，配置写成功后再 rename 目录
+            const oldWsRelative = agentList[i].workspace;
+            agentList[i].workspace = agentList[i].workspace.replace(currentDirName, expectedDirName);
+            renameInfo = { oldWsRelative: oldWsRelative, oldWsAbs: ws, newWsAbs: newWsPath, agentIdx: i };
           }
         }
       }
@@ -234,11 +233,25 @@ function updateAgent(agentId, body, res) {
     }
   }
   if (!found) { _jsonErr(res, 404, 'Agent not found'); return; }
-  if (_saveAgentList(data, agentList)) {
-    invalidateCache();
-    _jsonOk(res);
-    rosterSync.syncAllRosters();
-  } else { _jsonErr(res, 500, 'Failed to write config'); }
+  // P0-5: 先写配置（含新 workspace 路径），成功后再 rename 目录
+  if (!_saveAgentList(data, agentList)) {
+    _jsonErr(res, 500, 'Failed to write config'); return;
+  }
+  if (renameInfo) {
+    try {
+      fs.renameSync(renameInfo.oldWsAbs, renameInfo.newWsAbs);
+    } catch (e) {
+      // rename 失败，回滚配置
+      console.error('[Agent] Rename workspace failed:', e.message);
+      agentList[renameInfo.agentIdx].workspace = renameInfo.oldWsRelative;
+      _saveAgentList(data, agentList);
+      invalidateCache();
+      _jsonErr(res, 500, '重命名工作目录失败: ' + e.message); return;
+    }
+  }
+  invalidateCache();
+  _jsonOk(res);
+  rosterSync.syncAllRosters();
 }
 
 function deleteAgent(agentId, res) {

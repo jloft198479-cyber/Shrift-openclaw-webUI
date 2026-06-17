@@ -1,4 +1,5 @@
 const MODEL_PREFIX = 'openclaw/';
+const IDLE_TIMEOUT_MS = 60000; // P1-3: 60s 无 chunk 则 abort（空闲超时，非总时长）
 
 const Api = {
   _abortController: null,
@@ -8,10 +9,14 @@ const Api = {
    * 走 /v1/chat/completions + x-openclaw-agent-id 路由
    */
   chat: async function (messages, agentId, callbacks) {
+    // P1-6: 占用检测不 throw，避免触发 finally 清掉上一个请求的 controller
     if (this._abortController) {
-      throw new Error('Previous request still in progress');
+      const busyErr = new Error('Previous request still in progress');
+      (callbacks.onError || function () {})(busyErr);
+      return;
     }
-    this._abortController = new AbortController();
+    const controller = new AbortController(); // P1-6: 局部变量，finally 只清自己的
+    this._abortController = controller;
 
     const onDelta = callbacks.onDelta || function () {};
     const onDone = callbacks.onDone || function () {};
@@ -22,6 +27,18 @@ const Api = {
 
     const model = agentId ? MODEL_PREFIX + agentId : MODEL_PREFIX + 'main';
 
+    // P1-3: idle timeout — 每次 reader.read() 前重置，无 chunk 则 abort
+    let idleTimer = null;
+    function resetIdleTimer() {
+      if (idleTimer) clearTimeout(idleTimer);
+      idleTimer = setTimeout(function () {
+        controller.abort();
+      }, IDLE_TIMEOUT_MS);
+    }
+    function clearIdleTimer() {
+      if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+    }
+
     try {
       const fetchOpts = {
         method: 'POST',
@@ -31,7 +48,7 @@ const Api = {
           messages: messages,
           stream: true,
         }),
-        signal: this._abortController.signal,
+        signal: controller.signal,
       };
 
       if (agentId) {
@@ -69,7 +86,6 @@ const Api = {
           nonStreamAgent = json.model.slice(MODEL_PREFIX.length) || nonStreamAgent;
         }
         onDone(nonStreamAgent);
-        this._abortController = null;
         return;
       }
 
@@ -80,7 +96,9 @@ const Api = {
       let pendingToolCalls = {};
 
       while (true) {
+        resetIdleTimer(); // P1-3: 每次 read 前重置 idle timer
         const result = await reader.read();
+        clearIdleTimer(); // P1-3: 收到数据后清除
         if (result.done) break;
 
         buffer += decoder.decode(result.value, { stream: true });
@@ -93,7 +111,6 @@ const Api = {
             const data = line.slice(6).trim();
             if (data === '[DONE]') {
               onDone(lastModelAgent);
-              this._abortController = null;
               return;
             }
             try {
@@ -143,7 +160,6 @@ const Api = {
 
               if (choice.finish_reason === 'stop') {
                 onDone(lastModelAgent);
-                this._abortController = null;
                 return;
               }
             } catch (parseErr) { console.warn('[Api] SSE parse skip:', parseErr.message || parseErr); }
@@ -159,7 +175,11 @@ const Api = {
       }
       onError(err);
     } finally {
-      this._abortController = null;
+      clearIdleTimer(); // P1-3: 清理 idle timer
+      // P1-6: 只清自己的 controller，避免清掉其他请求的
+      if (this._abortController === controller) {
+        this._abortController = null;
+      }
     }
   },
 
