@@ -52,6 +52,12 @@ const State = {
     defaultModel: '',
   },
 
+  /** 工作目录状态 */
+  workspace: {
+    path: '',
+    exists: true,
+  },
+
   /** 会话列表 */
   sessions: [],
 
@@ -131,6 +137,9 @@ const State = {
       // Model 组
       'model.models': 'model-list',
       'model.defaultModel': 'model-switch',
+      // Workspace 组
+      'workspace.path': 'workspace',
+      'workspace.exists': 'workspace',
       // Sessions
       'sessions': 'session-list',
     };

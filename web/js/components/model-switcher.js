@@ -21,11 +21,38 @@ const ModelSwitcher = {
       html += '<option value="' + escapeHtml(m.id) + '"' + (m.id === currentModel ? ' selected' : '') + '>' + escapeHtml(m.name) + '</option>';
     });
     html += '</select>';
+
+    // workspace 指示器
+    var wsPath = State.workspace.path;
+    var wsExists = State.workspace.exists;
+    var wsName = wsPath ? wsPath.split(/[/\\]/).pop() : '未设置';
+    var wsBtn = wsPath ? '改' : '选';
+    var wsClass = wsPath && !wsExists ? ' workspace-warning' : '';
+    html += '<span class="bar-separator">·</span>';
+    html += '<span class="workspace-indicator' + wsClass + '">';
+    html += '<span class="workspace-icon">📂</span>';
+    html += '<span class="workspace-name">' + escapeHtml(wsName) + '</span>';
+    html += '<button class="workspace-btn" id="workspace-change-btn">' + wsBtn + '</button>';
+    html += '</span>';
+
     bar.innerHTML = html;
 
     bar.querySelector('#model-select')?.addEventListener('change', function (e) {
       ModelSwitcher.onModelChange(e.target.value);
     });
+
+    var wsBtnEl = bar.querySelector('#workspace-change-btn');
+    if (wsBtnEl) {
+      wsBtnEl.addEventListener('click', function () {
+        WorkspacePicker.toggle();
+      });
+    }
+
+    // 目录丢失警告
+    if (wsPath && !wsExists) {
+      var wsNameEl = bar.querySelector('.workspace-name');
+      if (wsNameEl) wsNameEl.title = '目录不可访问';
+    }
   },
 
   onModelChange: function (modelId) {
@@ -48,3 +75,8 @@ const ModelSwitcher = {
     ModelSwitcher.updateBar();
   },
 };
+
+// workspace 状态变更时刷新底栏
+State.on('workspace', function () {
+  ModelSwitcher.updateBar();
+});

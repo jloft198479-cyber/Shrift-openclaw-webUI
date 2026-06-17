@@ -18,6 +18,7 @@ const store = require('./fs-store');
 const agentRoutes = require('./agent-routes');
 const sessionSync = require('./session-sync');
 const debugTrace = require('./debug-trace');
+const rosterSync = require('./roster-sync');
 
 const TEXT_EXTS = {
   '.txt': 1, '.md': 1, '.json': 1, '.csv': 1,
@@ -81,6 +82,7 @@ module.exports = {
     const refreshSetupMode = deps.refreshSetupMode;
     const stateDir = deps.stateDir;
     const handleWorkspaceFile = deps.handleWorkspaceFile;
+    const invalidateAllowedDirsCache = deps.invalidateAllowedDirsCache;
 
     function handleUpload(req, res) {
       collectBody(req, function (b, _raw, err) {
@@ -262,7 +264,44 @@ module.exports = {
       { method: 'POST',   pattern: /^\/api\/logs\/clear$/,                 handler: function (m, req, res) { debugTrace.handleClearLogs(req, res); } },
       { method: 'POST',   pattern: /^\/api\/open-folder$/,                handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { _jsonRes(res, 413, {error:err.message}); return; } handleOpenFolder(b, res); }); } },
       { method: 'GET',    pattern: /^\/api\/file$/,                        handler: function (m, req, res) { handleWorkspaceFile(req, res); } },
+      { method: 'GET',    pattern: /^\/api\/workspace$/,                  handler: function (m, req, res) { handleWorkspaceGet(req, res); } },
+      { method: 'PUT',    pattern: /^\/api\/workspace$/,                  handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { _jsonRes(res, 413, {error:err.message}); return; } handleWorkspacePut(b, res); }); } },
+      { method: 'DELETE', pattern: /^\/api\/workspace$/,                  handler: function (m, req, res) { handleWorkspaceDelete(req, res); } },
+
     ];
+
+    // ── Workspace API ──────────────────────────────────────
+
+    var wsValidator = require('./workspace-validator');
+
+    function handleWorkspaceGet(req, res) {
+      var wsPath = store.readWorkspace();
+      if (!wsPath) { _jsonRes(res, 200, { path: '', exists: false }); return; }
+      var check = wsValidator.checkWorkspaceExists(wsPath);
+      _jsonRes(res, 200, { path: check.resolved, exists: check.exists });
+    }
+
+    function handleWorkspacePut(body, res) {
+      if (!body || !body.path) { _jsonRes(res, 400, { success: false, reason: '路径不能为空' }); return; }
+      var result = wsValidator.validateWorkspacePath(body.path);
+      if (!result.valid) { _jsonRes(res, 400, { success: false, reason: result.reason }); return; }
+      if (!store.writeWorkspace(result.resolved)) { _jsonRes(res, 500, { success: false, reason: '写入配置失败' }); return; }
+      if (invalidateAllowedDirsCache) invalidateAllowedDirsCache();
+      // 更新 AGENTS.md 中的项目上下文引导语 + 在项目目录下创建 AGENTS.md（如不存在）
+      var defaultWorkspace = store.resolveHome(store.readConfig().agents.defaults.workspace || '');
+      if (defaultWorkspace) rosterSync.syncProjectContext(defaultWorkspace, result.resolved);
+      rosterSync.ensureProjectAgentsMd(result.resolved);
+      _jsonRes(res, 200, { success: true, path: result.resolved });
+    }
+
+    function handleWorkspaceDelete(req, res) {
+      if (!store.writeWorkspace('')) { _jsonRes(res, 500, { success: false, reason: '清除配置失败' }); return; }
+      if (invalidateAllowedDirsCache) invalidateAllowedDirsCache();
+      // 移除 AGENTS.md 中的项目上下文引导语
+      var defaultWorkspace = store.resolveHome(store.readConfig().agents.defaults.workspace || '');
+      if (defaultWorkspace) rosterSync.syncProjectContext(defaultWorkspace, '');
+      _jsonRes(res, 200, { success: true });
+    }
 
     function handleOpenFolder(body, res) {
       let dir;

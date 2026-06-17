@@ -392,6 +392,24 @@ function deleteSession(id) {
   }
 }
 
+function readWorkspace() {
+  var data = readConfig();
+  if (!data || !data.agents || !data.agents.defaults) return '';
+  return data.agents.defaults.repoRoot || '';
+}
+
+function writeWorkspace(absPath) {
+  var data = readConfig();
+  if (!data) return false;
+  if (!data.agents) data.agents = {};
+  if (!data.agents.defaults) data.agents.defaults = {};
+  data.agents.defaults.repoRoot = absPath || '';
+  // 清除之前版本错误写入的字段
+  if ('workspace' in data) delete data.workspace;
+  if (data.meta && 'webuiWorkspace' in data.meta) delete data.meta.webuiWorkspace;
+  return writeConfig(data);
+}
+
 module.exports = {
   init: init,
   resolveHome: resolveHome,
@@ -404,6 +422,8 @@ module.exports = {
   getAgentList: getAgentList,
   findAgentRaw: findAgentRaw,
   getAgentWorkspace: getAgentWorkspace,
+  readWorkspace: readWorkspace,
+  writeWorkspace: writeWorkspace,
   scanSkills: scanSkills,
   scanGlobalSkills: scanGlobalSkills,
   scanExtraDirsSkills: scanExtraDirsSkills,

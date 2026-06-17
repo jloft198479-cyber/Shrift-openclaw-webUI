@@ -256,6 +256,21 @@ const Api = {
       });
   },
 
+  getWorkspace: async function () {
+    return await this._fetch('/api/workspace');
+  },
+
+  setWorkspace: async function (path) {
+    return await this._fetch('/api/workspace', {
+      method: 'PUT',
+      body: JSON.stringify({ path: path }),
+    });
+  },
+
+  clearWorkspace: async function () {
+    return await this._fetch('/api/workspace', { method: 'DELETE' });
+  },
+
   _fetch: async function (url, opts) {
     const controller = new AbortController();
     const timer = setTimeout(function () { controller.abort(); }, 15000);

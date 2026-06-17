@@ -1335,6 +1335,93 @@ body.resizing-agent-section * {
 .model-dd-desc { font-size: var(--font-xs); color: var(--meta); }
 .model-dd-check { font-size: var(--font-base); color: var(--accent); }
 
+/* ── 工作目录指示器 ──────────────────────────────────────── */
+.bar-separator {
+  color: var(--border);
+  margin: 0 4px;
+  user-select: none;
+}
+.workspace-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--font-xs);
+  color: var(--meta);
+  white-space: nowrap;
+}
+.workspace-indicator .workspace-icon { font-size: 12px; }
+.workspace-indicator .workspace-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.workspace-indicator.workspace-warning .workspace-name {
+  color: var(--error, #e55);
+}
+.workspace-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: var(--font-xs);
+  color: var(--meta);
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition);
+}
+.workspace-btn:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ── 工作目录选择面板 ──────────────────────────────────────── */
+.workspace-panel {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--elev-ring);
+  z-index: calc(var(--z-modal) - 1);
+  margin-bottom: 4px;
+  padding: 8px;
+  animation: fadeIn 120ms ease-out;
+}
+.ws-panel-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.ws-path-input {
+  flex: 1;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: var(--font-xs);
+  color: var(--text);
+  outline: none;
+  min-width: 0;
+}
+.ws-path-input:focus { border-color: var(--accent); }
+.ws-confirm-btn,
+.ws-clear-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: var(--font-xs);
+  color: var(--meta);
+  cursor: pointer;
+  transition: color var(--transition), border-color var(--transition);
+}
+.ws-confirm-btn:hover,
+.ws-clear-btn:hover { color: var(--accent); border-color: var(--accent); }
+.ws-confirm-btn { color: var(--accent); border-color: var(--accent); }
+.ws-panel-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 /* 📎 附件按钮 */
 .attach-btn {
   background: none; border: none; cursor: pointer;

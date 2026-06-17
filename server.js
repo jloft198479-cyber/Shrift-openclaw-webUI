@@ -352,6 +352,10 @@ function _getWorkspaceAllowedDirs() {
       if (ws) dirs.push(path.resolve(ws));
     }
   }
+  // 全局项目目录（agents.defaults.repoRoot）
+  var defaults = data.agents && data.agents.defaults;
+  var repoRoot = defaults ? store.resolveHome(defaults.repoRoot || '') : '';
+  if (repoRoot) dirs.push(path.resolve(repoRoot));
   // 全局 skills 目录
   var gsDir = store._resolveGlobalSkillsDir();
   if (gsDir) dirs.push(path.resolve(gsDir));
@@ -362,6 +366,11 @@ function _getWorkspaceAllowedDirs() {
   _wsAllowedDirsCache = dirs;
   _wsAllowedDirsCacheTime = now;
   return dirs;
+}
+
+function invalidateAllowedDirsCache() {
+  _wsAllowedDirsCache = null;
+  _wsAllowedDirsCacheTime = 0;
 }
 
 function serveStaticWithOverride(req, res, overridePath) {
@@ -391,6 +400,7 @@ const routeHandlers = routes.init({
   refreshSetupMode: _refreshSetupMode,
   stateDir: store.getDataDir(),
   handleWorkspaceFile: handleWorkspaceFile,
+  invalidateAllowedDirsCache: invalidateAllowedDirsCache,
 });
 const ROUTES = routeHandlers.routes;
 

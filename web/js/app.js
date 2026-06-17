@@ -42,6 +42,11 @@ async function init() {
     await Api.fetchModels();
   } catch (e) {}
 
+  try {
+    var wsData = await Api.getWorkspace();
+    State.setState({ workspace: { path: wsData.path || '', exists: !!wsData.exists } });
+  } catch (e) {}
+
   SessionManager.loadSessions().then(function () {
     const lastSessionId = localStorage.getItem('lastSessionId') || '';
 

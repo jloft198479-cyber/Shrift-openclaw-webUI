@@ -305,6 +305,77 @@ function _syncBootstrapMd(agentId, agentList, workspace) {
   store.writeFile(bootstrapPath, lines.join('\n'));
 }
 
+const _PROJECT_CTX_START = '<!-- project-context-start -->';
+const _PROJECT_CTX_END = '<!-- project-context-end -->';
+
+/**
+ * 在项目目录下自动创建 AGENTS.md（如不存在）。
+ * 提供基础模板，用户可自行补充。
+ */
+function _ensureProjectAgentsMd(repoRoot) {
+  var agentsPath = path.join(repoRoot, 'AGENTS.md');
+  try {
+    if (fs.existsSync(agentsPath)) return; // 已存在，不覆盖
+  } catch (e) { return; }
+
+  var dirName = path.basename(repoRoot);
+  var content = '# ' + dirName + ' — 项目上下文\n'
+    + '\n'
+    + '> 此文件由虾指挥自动创建，供 Agent 了解项目规范。请根据实际情况补充内容。\n'
+    + '\n'
+    + '## 技术栈\n'
+    + '\n'
+    + '（请补充项目使用的技术栈）\n'
+    + '\n'
+    + '## 开发规范\n'
+    + '\n'
+    + '（请补充项目的开发规范和约定）\n'
+    + '\n'
+    + '## 目录结构\n'
+    + '\n'
+    + '（请补充项目的目录结构说明）\n';
+
+  try {
+    store.writeFile(agentsPath, content);
+    console.log('[Roster] Created project AGENTS.md:', agentsPath);
+  } catch (e) {
+    console.error('[Roster] Failed to create project AGENTS.md:', e.message);
+  }
+}
+
+/**
+ * 在 AGENTS.md 中注入/移除项目上下文引导语。
+ * 设置 repoRoot 时追加引导段落，清除时移除。
+ * 利用 OpenClaw 原生的 AGENTS.md 自动注入机制，零额外依赖。
+ */
+function syncProjectContext(workspace, repoRoot) {
+  var agentsPath = path.join(workspace, 'AGENTS.md');
+  var existing = store.readFile(agentsPath) || '';
+
+  // 先移除旧的项目上下文段落
+  var cleaned = existing.replace(
+    new RegExp('\\n*' + _PROJECT_CTX_START.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      + '[\\s\\S]*?' + _PROJECT_CTX_END.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\n*'),
+    '\n'
+  ).trim();
+
+  // 如果有 repoRoot，追加新的引导段落
+  if (repoRoot && repoRoot.trim()) {
+    var section = _PROJECT_CTX_START + '\n'
+      + '## 当前项目\n'
+      + '\n'
+      + '项目目录（代码工作目录，非物理办公室）: ' + repoRoot + '\n'
+      + '执行项目相关任务时，请先读取该目录下的 AGENTS.md，遵循其中的项目规范和约定。\n'
+      + _PROJECT_CTX_END;
+    cleaned = cleaned + '\n\n' + section;
+  }
+
+  cleaned = cleaned.trim() + '\n';
+  if (cleaned !== existing) {
+    store.writeFile(agentsPath, cleaned);
+  }
+}
+
 function _cleanAgentsMd(workspace) {
   const agentsPath = path.join(workspace, 'AGENTS.md');
   const existing = store.readFile(agentsPath) || '';
@@ -400,6 +471,12 @@ function syncAllRosters() {
     try { syncSubAgentRoster(list[i].id, list); }
     catch (e) { console.error('[Roster] syncSubAgentRoster failed for ' + list[i].id + ':', e.message); }
   }
+  // 同步项目上下文引导语
+  try {
+    var defaultWorkspace = store.resolveHome((data.agents.defaults && data.agents.defaults.workspace) || '');
+    var repoRoot = store.resolveHome((data.agents.defaults && data.agents.defaults.repoRoot) || '');
+    if (defaultWorkspace) syncProjectContext(defaultWorkspace, repoRoot);
+  } catch (e) { console.error('[Roster] syncProjectContext failed:', e.message); }
 }
 
 function unbindSkillFromAll(skillId) {
@@ -426,6 +503,8 @@ module.exports = {
   syncTeamRoster: syncTeamRoster,
   syncSubAgentRoster: syncSubAgentRoster,
   syncAllRosters: syncAllRosters,
+  syncProjectContext: syncProjectContext,
+  ensureProjectAgentsMd: _ensureProjectAgentsMd,
   unbindSkillFromAll: unbindSkillFromAll,
   stripSystemSection: _stripSystemSection,
 };
