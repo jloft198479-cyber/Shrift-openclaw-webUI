@@ -161,8 +161,8 @@ function createWsClient(gwUrl, gwToken) {
         const pr = pendingRequests[id];
         if (pr.timer) clearTimeout(pr.timer);
         pr.reject(new Error('WS disconnected'));
+        delete pendingRequests[id];
       }
-      Object.keys(pendingRequests).forEach(function (id) { delete pendingRequests[id]; });
       emitter.emit('disconnected', { code: code });
       scheduleReconnect();
     });
