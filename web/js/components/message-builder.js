@@ -106,12 +106,8 @@ const MessageBuilder = {
     for (let i = 0; i < attachments.length; i++) {
       const att = attachments[i];
       const isImage = att.type && att.type.indexOf('image/') === 0;
-      if (isImage && att.dataUrl) {
-        parts.push({
-          type: 'image_url',
-          image_url: { url: att.dataUrl },
-        });
-      } else if (isImage && att.path) {
+      // P0-1: 只用 path 分支，不重发 dataUrl——图片已上传服务器，每轮重发 base64 浪费 token
+      if (isImage && att.path) {
         parts.push({
           type: 'image_url',
           image_url: { url: window.location.origin + att.path },

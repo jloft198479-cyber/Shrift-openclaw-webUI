@@ -123,7 +123,7 @@ const AttachmentBar = {
         throw new Error(err.error || '上传失败 (HTTP ' + resp.status + ')');
       }
       const result = await resp.json();
-      result.dataUrl = dataUrl;
+      // P0-1: 不再把 dataUrl 附加到返回值——saveUserMessage 不存，buildMultimodalContent 不用，避免未来误用导致重发
       results.push(result);
     }
     return results;

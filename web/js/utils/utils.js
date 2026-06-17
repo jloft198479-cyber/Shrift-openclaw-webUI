@@ -111,6 +111,7 @@ const Utils = {
   /* ── 滚动工具 ──────────────────────────────────────────── */
 
   _scrollRafId: null,
+  _pendingSmooth: true,
 
   /**
    * 滚动到底部（内置 rAF 节流，高频调用时合并）
@@ -120,15 +121,16 @@ const Utils = {
   scrollToBottom: function (el, smooth) {
     if (!el) return;
     if (smooth === undefined) smooth = true;
-    if (!smooth) {
-      el.scrollTo({ top: el.scrollHeight, behavior: 'instant' });
+    // 统一走 rAF 合并：高频 delta 调用时只执行最后一次，避免每个 delta 同步 scrollTo 强制 layout
+    if (this._scrollRafId) {
+      this._pendingSmooth = smooth; // 更新为最后一次调用的参数
       return;
     }
-    if (this._scrollRafId) return;
+    this._pendingSmooth = smooth;
     const self = this;
     this._scrollRafId = requestAnimationFrame(function () {
       self._scrollRafId = null;
-      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      el.scrollTo({ top: el.scrollHeight, behavior: self._pendingSmooth ? 'smooth' : 'instant' });
     });
   },
 

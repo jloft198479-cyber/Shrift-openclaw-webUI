@@ -41,9 +41,9 @@ const SessionInteraction = {
     if (!session) return;
     const msgObj = { role: 'user', content: displayText };
     if (attachmentPaths && attachmentPaths.length > 0) {
+      // P0-1: 不存 dataUrl，只存 path——避免每轮重发 base64 图片（Gateway 文档明确图像块不会被修剪）
       msgObj.attachments = attachmentPaths.map(function (a) {
         const att = { name: a.name, path: a.path, type: a.type };
-        if (a.dataUrl && a.dataUrl.length < 5120000) att.dataUrl = a.dataUrl;
         if (a.content) att.content = a.content;
         return att;
       });
