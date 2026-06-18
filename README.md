@@ -136,9 +136,22 @@ cp config.example.json config.json
 
 ### 启动
 
-**方式一：一键启动（推荐）**
+**方式一：PWA 桌面快捷方式（推荐，体验最佳）**
 
-Windows 双击 `虾指挥.bat`，或运行：
+首次使用，生成桌面快捷方式：
+
+```powershell
+.\create-shortcut.ps1
+```
+
+之后双击桌面 **虾指挥** 快捷方式即可。启动器（`launcher.js`）自动完成：
+1. 检测并启动 OpenClaw Gateway
+2. 启动 Web UI 服务
+3. 以 Edge/Chrome **PWA 模式**打开（独立窗口、无地址栏、像原生应用）
+4. **关闭窗口自动停止所有服务**（无需手动关后台）
+5. 单实例锁：重复打开会激活已有窗口
+
+**方式二：一键脚本启动**
 
 ```powershell
 .\start.ps1
@@ -148,9 +161,9 @@ Windows 双击 `虾指挥.bat`，或运行：
 1. 设置环境变量
 2. 检测并启动 OpenClaw Gateway
 3. 启动 Web UI 服务
-4. 打开浏览器
+4. 打开默认浏览器
 
-**方式二：手动启动**
+**方式三：手动启动**
 
 ```bash
 # 终端 1：启动 Gateway
