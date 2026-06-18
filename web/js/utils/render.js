@@ -49,6 +49,15 @@ function _getMdRenderer() {
     attrs += ' loading="lazy"';
     return '<img ' + attrs + '>';
   };
+  /* 链接渲染：新标签页打开，防止跳转打断当前对话 */
+  _mdRenderer.link = function(obj) {
+    var href = typeof obj === 'object' ? (obj.href || '') : (obj || '');
+    var text = typeof obj === 'object' ? (obj.text || '') : (obj || '');
+    var title = typeof obj === 'object' ? (obj.title || '') : '';
+    var attrs = 'href="' + Utils.escapeHtml(href) + '" target="_blank" rel="noopener noreferrer"';
+    if (title) attrs += ' title="' + Utils.escapeHtml(title) + '"';
+    return '<a ' + attrs + '>' + text + '</a>';
+  };
   return _mdRenderer;
 }
 
@@ -77,7 +86,7 @@ function renderMarkdown(text, streaming) {
     if (typeof DOMPurify !== 'undefined') {
       html = DOMPurify.sanitize(raw, {
         ADD_TAGS: ['code', 'pre', 'span', 'button', 'img'],
-        ADD_ATTR: ['class', 'id', 'data-cb-id', 'title', 'alt', 'loading'],
+        ADD_ATTR: ['class', 'id', 'data-cb-id', 'title', 'alt', 'loading', 'target', 'rel'],
       });
     } else {
       html = raw;

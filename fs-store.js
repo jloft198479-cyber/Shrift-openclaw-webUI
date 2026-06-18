@@ -347,6 +347,7 @@ function getSessionList() {
             tag: data.tag || '',
             created_at: data.created_at || 0,
             updated_at: data.updated_at || 0,
+            workspace: data.workspace || '',
           });
         }
       } catch (e) {}

@@ -27,7 +27,7 @@ const SessionList = {
       return true;
     }) : allSessions;
     const key = filter + '|' + currentSessionId + '|' + allSessions.map(function (s) {
-      return s.id + ':' + s.name + ':' + (s.updated_at || '') + ':' + (s.tag || '');
+      return s.id + ':' + s.name + ':' + (s.updated_at || '') + ':' + (s.tag || '') + ':' + (s.workspace || '');
     }).join(',');
     if (key === this._cacheKey) return;
     this._cacheKey = key;
@@ -42,6 +42,12 @@ const SessionList = {
 
     list.innerHTML = sessions.map(function (s) {
       const tagHtml = s.tag === 'pending' ? '<span class="tag-icon">📋</span>' : '';
+      // workspace 小标签：显示会话绑定的项目目录名
+      var wsHtml = '';
+      if (s.workspace) {
+        var wsName = s.workspace.split(/[/\\]/).pop();
+        if (wsName) wsHtml = '<span class="session-ws-badge" title="' + escapeHtml(s.workspace) + '">📂' + escapeHtml(wsName) + '</span>';
+      }
       return '<div class="session-item' + (s.id === currentSessionId ? ' active' : '') + '"'
         + ' data-id="' + escapeHtml(s.id) + '"'
         + (s.agent ? ' data-agent="' + escapeHtml(s.agent) + '"' : '') + '>'
@@ -49,6 +55,7 @@ const SessionList = {
         + '<div class="name">' + tagHtml
         + (s.agent ? ('<span class="session-agent-badge" title="' + escapeHtml(s.agent) + '">' + escapeHtml(SessionList._getAgentLabel(s.agent)) + '</span>') : '')
         + escapeHtml(s.name || '新对话') + '</div>'
+        + (wsHtml ? '<div class="session-ws-row">' + wsHtml + '</div>' : '')
         + '</div>'
         + '<button class="menu-btn" data-menu="' + escapeHtml(s.id) + '" title="更多操作">⋯</button>'
         + '</div>';

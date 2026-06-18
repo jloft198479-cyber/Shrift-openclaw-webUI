@@ -98,7 +98,9 @@ var WorkspacePicker = {
     Api.setWorkspace(path).then(function (result) {
       if (result.success) {
         State.setState({ workspace: { path: result.path, exists: true } });
-        showToast('工作目录已更新，新会话生效', 3000);
+        // per-session：把当前 workspace 写入当前会话，切换回来时自动恢复
+        SessionInteraction.updateWorkspace(State.currentSessionId, result.path);
+        showToast('已绑定到当前会话', 3000);
         self.hide();
       } else {
         showToast(result.reason || '设置失败', 3000, 'error');
@@ -113,7 +115,9 @@ var WorkspacePicker = {
     Api.clearWorkspace().then(function (result) {
       if (result.success) {
         State.setState({ workspace: { path: '', exists: false } });
-        showToast('工作目录已清除', 2000);
+        // per-session：清除当前会话的 workspace 绑定
+        SessionInteraction.updateWorkspace(State.currentSessionId, '');
+        showToast('已解除当前会话的工作目录绑定', 2000);
         self.hide();
       }
     }).catch(function (err) {

@@ -3,6 +3,7 @@ const IDLE_TIMEOUT_MS = 60000; // P1-3: 60s 无 chunk 则 abort（空闲超时�
 
 const Api = {
   _abortController: null,
+  _currentSessionKey: '',
 
   /**
    * 直接对话模式 — 消息发给指定 agent（或 main）
@@ -55,7 +56,9 @@ const Api = {
         fetchOpts.headers['x-openclaw-agent-id'] = agentId;
       }
       const currentSid = State.currentSessionId || '';
-      fetchOpts.headers['x-openclaw-session-key'] = 'agent:' + (agentId || 'main') + ':webui' + (currentSid ? ':' + currentSid : '');
+      const sessionKey = 'agent:' + (agentId || 'main') + ':webui' + (currentSid ? ':' + currentSid : '');
+      fetchOpts.headers['x-openclaw-session-key'] = sessionKey;
+      this._currentSessionKey = sessionKey; // 保存供 stopGeneration 使用
 
       const res = await fetch('/v1/chat/completions', fetchOpts);
 
@@ -183,11 +186,35 @@ const Api = {
     }
   },
 
+  /**
+   * 停止生成 — 双保险：
+   * 1. 调用后端 /api/sessions/stop → Gateway chat.abort RPC（真正停止 agent run，省 token）
+   * 2. AbortController.abort()（立即中断前端流，快速响应）
+   */
   stopGeneration: function () {
+    // 先发 chat.abort 让 Gateway 停止 agent run（fire-and-forget，不阻塞前端清理）
+    if (this._currentSessionKey) {
+      this.stopAgent(this._currentSessionKey);
+      this._currentSessionKey = '';
+    }
     if (this._abortController) {
       this._abortController.abort();
       this._abortController = null;
     }
+  },
+
+  /**
+   * 调用后端停止 agent run — 转发到 Gateway 的 chat.abort WS RPC
+   * fire-and-forget：失败静默，不阻塞调用方
+   */
+  stopAgent: function (sessionKey) {
+    fetch('/api/sessions/stop', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sessionKey: sessionKey }),
+    }).catch(function () {
+      // 静默失败：前端 AbortController 仍会中断流，用户无感
+    });
   },
 
   fetchAgents: async function () {

@@ -164,6 +164,25 @@ module.exports = {
       _jsonRes(res, 200, { success: true, messages: messages });
     }
 
+    // 停止 agent run — 调用官方 chat.abort WS RPC，中止指定 session 的所有活跃 run
+    function handleSessionStop(body, res) {
+      if (!body || !body.sessionKey || typeof body.sessionKey !== 'string') {
+        _jsonRes(res, 400, { error: 'Missing sessionKey' });
+        return;
+      }
+      if (!wsClient || !wsClient.isConnected()) {
+        _jsonRes(res, 503, { error: 'Gateway WS not connected' });
+        return;
+      }
+      wsClient.sendRequest('chat.abort', { sessionKey: body.sessionKey }, 10000)
+        .then(function (payload) {
+          _jsonRes(res, 200, { success: true, payload: payload });
+        })
+        .catch(function (err) {
+          _jsonRes(res, 502, { error: 'chat.abort failed: ' + err.message });
+        });
+    }
+
     function handleSetup(req, res) {
       collectBody(req, function (body, raw, err) {
         if (err) { _jsonRes(res, 413, { error: err.message }); return; }
@@ -259,6 +278,7 @@ module.exports = {
       { method: 'PUT',    pattern: /^\/api\/sessions\/([^\/]+)$/,          handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { res.writeHead(413, {'Content-Type':'application/json'}); res.end(JSON.stringify({error:err.message})); return; } handleSessionSave(b, res); }); } },
       { method: 'DELETE', pattern: /^\/api\/sessions\/([^\/]+)$/,          handler: function (m, req, res) { handleSessionDelete(decodeURIComponent(m[1]), res); } },
       { method: 'GET',    pattern: /^\/api\/sessions\/([^\/]+)\/sync$/,    handler: function (m, req, res) { handleSessionSync(decodeURIComponent(m[1]), req, res); } },
+      { method: 'POST',   pattern: /^\/api\/sessions\/stop$/,              handler: function (m, req, res) { collectBody(req, function (b, _r, err) { if (err) { _jsonRes(res, 413, {error:err.message}); return; } handleSessionStop(b, res); }); } },
       { method: 'POST',   pattern: /^\/api\/log$/,                         handler: function (m, req, res) { debugTrace.handlePostLog(req, res, collectBody); } },
       { method: 'GET',    pattern: /^\/api\/logs$/,                        handler: function (m, req, res) { debugTrace.handleGetLogs(req, res); } },
       { method: 'POST',   pattern: /^\/api\/logs\/clear$/,                 handler: function (m, req, res) { debugTrace.handleClearLogs(req, res); } },

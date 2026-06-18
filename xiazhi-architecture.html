@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>虾指挥 · 微服务系统架构图 — Excalidraw 手绘风格</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: #fff;
+    font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    overflow: auto;
+  }
+  svg { display: block; }
+  .info {
+    text-align: center;
+    padding: 18px 0 6px;
+    font-size: 13px;
+    color: #999;
+  }
+</style>
+</head>
+<body>
+
+<!-- Grid background via SVG pattern -->
+<svg id="cvs" viewBox="0 0 1700 1250" xmlns="http://www.w3.org/2000/svg"
+     style="width:100%;max-width:1700px;margin:0 auto;">
+
+<defs>
+  <!-- grid -->
+  <pattern id="g2" width="20" height="20" patternUnits="userSpaceOnUse">
+    <path d="M20,0 L0,0 0,20" fill="none" stroke="#eaeaea" stroke-width="0.4"/>
+  </pattern>
+  <pattern id="g1" width="100" height="100" patternUnits="userSpaceOnUse">
+    <rect width="100" height="100" fill="url(#g2)"/>
+    <path d="M100,0 L0,0 0,100" fill="none" stroke="#ddd" stroke-width="0.7"/>
+  </pattern>
+
+  <!-- arrowheads -->
+  <marker id="ab" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0,1 10,3.5 0,6" fill="#3498db"/></marker>
+  <marker id="ag" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0,1 10,3.5 0,6" fill="#2ecc71"/></marker>
+  <marker id="ao" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0,1 10,3.5 0,6" fill="#e67e22"/></marker>
+  <marker id="ar" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0,1 10,3.5 0,6" fill="#e74c3c"/></marker>
+  <marker id="ap" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0,1 10,3.5 0,6" fill="#8e44ad"/></marker>
+  <marker id="ay" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0,1 10,3.5 0,6" fill="#f39c12"/></marker>
+  <marker id="ad" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0,1 10,3.5 0,6" fill="#95a5a6"/></marker>
+
+  <!-- hand-drawn filter -->
+  <filter id="h1" x="-3%" y="-3%" width="106%" height="106%">
+    <feTurbulence type="turbulence" baseFrequency="0.035" numOctaves="4" seed="3" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="2.0" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+  <filter id="h2" x="-4%" y="-4%" width="108%" height="108%">
+    <feTurbulence type="turbulence" baseFrequency="0.025" numOctaves="5" seed="7" result="n"/>
+    <feDisplacementMap in="SourceGraphic" in2="n" scale="3.0" xChannelSelector="R" yChannelSelector="G"/>
+  </filter>
+</defs>
+
+<!-- background -->
+<rect width="1700" height="1250" fill="url(#g1)"/>
+
+</svg>
+
+<script>
+// ============================================================
+//  Rough renderer (inspired by rough.js / Excalidraw)
+//  Inline, no dependencies
+// ============================================================
+const NS = "http://www.w3.org/2000/svg";
+const svg = document.getElementById("cvs");
+const X = svg.namespaceURI;
+
+// Seeded PRNG (xorshift32)
+function rng(seed) {
+  let s = seed | 0;
+  return function() {
+    s ^= s << 13; s ^= s >> 17; s ^= s << 5;
+    return ((s < 0 ? ~s + 1 : s) % 0xFFFFFFFF) / 0xFFFFFFFF;
+  };
+}
+
+// Add element to SVG
+function add(el) { svg.appendChild(el); return el; }
+
+// ── Rough rectangle (Excalidraw double-stroke style) ──
+function rrect(x, y, w, h, opt = {}) {
+  const s = opt.seed || 0;
+  const R = opt.rough || 1.5;
+  const sw = opt.sw || 2;
+  const fill = opt.fill || "#fff";
+  const stroke = opt.stroke || "#000";
+  const g = document.createElementNS(NS, "g");
+
+  // Generate 4 corner points with small random offsets (two sets for double stroke)
+  function corners(x, y, w, h, r) {
+    const o = [];
+    for (let i = 0; i < 8; i++) o.push((r() - 0.5) * R * 2);
+    return [
+      [x + o[0], y + o[1]],
+      [x + w + o[2], y + o[3]],
+      [x + w + o[4], y + h + o[5]],
+      [x + o[6], y + h + o[7]],
+    ];
+  }
+
+  function makePath(corners, r) {
+    // Use quadratic bezier to simulate hand-drawn wobbly rectangle
+    let d = "";
+    for (let i = 0; i < 4; i++) {
+      const c = corners[i];
+      const n = corners[(i+1)%4];
+      const mx = (c[0]+n[0])/2 + (r()-0.5)*R*3;
+      const my = (c[1]+n[1])/2 + (r()-0.5)*R*3;
+      d += (i===0?"M":"Q") + c[0].toFixed(1) + "," + c[1].toFixed(1)
+         + " " + mx.toFixed(1) + "," + my.toFixed(1)
+         + " " + n[0].toFixed(1) + "," + n[1].toFixed(1);
+    }
+    return d + " Z";
+  }
+
+  const r1 = rng(s);
+  const r2 = rng(s + 137);
+
+  // Fill (subtle, inset)
+  const fi = document.createElementNS(NS, "rect");
+  fi.setAttribute("x", x+4); fi.setAttribute("y", y+4);
+  fi.setAttribute("width", w-8); fi.setAttribute("height", h-8);
+  fi.setAttribute("rx", 2); fi.setAttribute("ry", 2);
+  fi.setAttribute("fill", fill); fi.setAttribute("opacity", "0.3");
+  g.appendChild(fi);
+
+  // Stroke 1
+  const p1 = document.createElementNS(NS, "path");
+  p1.setAttribute("d", makePath(corners(x,y,w,h,r1), r1));
+  p1.setAttribute("fill", "none");
+  p1.setAttribute("stroke", stroke);
+  p1.setAttribute("stroke-width", sw);
+  p1.setAttribute("stroke-linecap", "round");
+  p1.setAttribute("stroke-linejoin", "round");
+  g.appendChild(p1);
+
+  // Stroke 2 (ghost, slightly different)
+  const p2 = document.createElementNS(NS, "path");
+  p2.setAttribute("d", makePath(corners(x,y,w,h,r2), r2));
+  p2.setAttribute("fill", "none");
+  p2.setAttribute("stroke", stroke);
+  p2.setAttribute("stroke-width", sw * 0.6);
+  p2.setAttribute("stroke-linecap", "round");
+  p2.setAttribute("opacity", "0.45");
+  g.appendChild(p2);
+
+  return g;
+}
+
+// ── Rough line ──
+function rline(x1,y1,x2,y2, opt={}) {
+  const r = rng(opt.seed||0);
+  const R = opt.rough || 1.2;
+  const steps = Math.max(3, Math.floor(Math.hypot(x2-x1, y2-y1) / 10));
+  let d = `M${x1.toFixed(1)},${y1.toFixed(1)}`;
+  for (let i = 1; i <= steps; i++) {
+    const t = i/steps;
+    const px = x1 + (x2-x1)*t + (r()-0.5)*R*2.5;
+    const py = y1 + (y2-y1)*t + (r()-0.5)*R*2.5;
+    d += ` L${px.toFixed(1)},${py.toFixed(1)}`;
+  }
+  const p = document.createElementNS(NS, "path");
+  p.setAttribute("d", d);
+  p.setAttribute("fill", "none");
+  p.setAttribute("stroke", opt.stroke || "#000");
+  p.setAttribute("stroke-width", opt.sw || 1.8);
+  p.setAttribute("stroke-linecap", "round");
+  if (opt.dash) p.setAttribute("stroke-dasharray", opt.dash);
+  if (opt.markerEnd) p.setAttribute("marker-end", opt.markerEnd);
+  return p;
+}
+
+// ── Rough arrow (line + optional label) ──
+function rarrow(x1,y1,x2,y2, label, opt={}) {
+  const g = document.createElementNS(NS, "g");
+  g.appendChild(rline(x1,y1,x2,y2, opt));
+  if (label) {
+    const lx = (x1+x2)/2 + (opt.ldx||0);
+    const ly = (y1+y2)/2 + (opt.ldy||-7);
+    const t = document.createElementNS(NS, "text");
+    t.setAttribute("x", lx); t.setAttribute("y", ly);
+    t.setAttribute("text-anchor", "middle");
+    t.setAttribute("font-size", opt.lsize || 9.5);
+    t.setAttribute("fill", opt.stroke || "#555");
+    t.setAttribute("font-family", "'PingFang SC','Microsoft YaHei',sans-serif");
+    t.textContent = label;
+    g.appendChild(t);
+  }
+  return g;
+}
+
+// ── Text block ──
+function txt(lines, x, y, opt={}) {
+  const g = document.createElementNS(NS, "g");
+  const size = opt.size || 12;
+  const anchor = opt.anchor || "start";
+  const font = opt.font || "'PingFang SC','Microsoft YaHei',sans-serif";
+  const weight = opt.weight || "normal";
+  const fill = opt.fill || "#1a1a2e";
+  const r = rng(opt.seed||0);
+  (Array.isArray(lines)?lines:[lines]).forEach((line,i) => {
+    const t = document.createElementNS(NS, "text");
+    const ox = (r()-0.5)*0.7, oy = (r()-0.5)*0.5;
+    t.setAttribute("x", x + ox);
+    t.setAttribute("y", y + i*(size+3.5) + oy);
+    t.setAttribute("font-size", size);
+    t.setAttribute("font-family", font);
+    t.setAttribute("font-weight", weight);
+    t.setAttribute("fill", fill);
+    t.setAttribute("font-family", font);
+    if (anchor) t.setAttribute("text-anchor", anchor);
+    t.textContent = line;
+    g.appendChild(t);
+  });
+  return g;
+}
+
+// ── Rough ellipse ──
+function rellipse(cx,cy,rx,ry,opt={}) {
+  const r = rng(opt.seed||0);
+  const R = opt.rough||1.5;
+  const g = document.createElementNS(NS,"g");
+  // Fill
+  const f = document.createElementNS(NS,"ellipse");
+  f.setAttribute("cx",cx); f.setAttribute("cy",cy);
+  f.setAttribute("rx",rx-2); f.setAttribute("ry",ry-2);
+  f.setAttribute("fill",opt.fill||"none");
+  f.setAttribute("opacity","0.3");
+  g.appendChild(f);
+  // Rough outline
+  let d = "";
+  const N = 28;
+  for (let i=0;i<=N;i++) {
+    const a = 2*Math.PI*i/N;
+    const px = cx + rx*Math.cos(a) + (r()-0.5)*R*2;
+    const py = cy + ry*Math.sin(a) + (r()-0.5)*R*2;
+    d += (i===0?"M":"L")+px.toFixed(1)+","+py.toFixed(1);
+  }
+  d += " Z";
+  const p = document.createElementNS(NS,"path");
+  p.setAttribute("d",d);
+  p.setAttribute("fill","none");
+  p.setAttribute("stroke",opt.stroke||"#000");
+  p.setAttribute("stroke-width",opt.sw||2);
+  p.setAttribute("stroke-linecap","round");
+  g.appendChild(p);
+  return g;
+}
+
+// ============================================================
+//  DRAW THE DIAGRAM
+// ============================================================
+
+// ── Colors ──
+const B = {fill:"#e3f2fd",stroke:"#1565c0"}; // blue
+const G = {fill:"#e8f5e9",stroke:"#2e7d32"}; // green
+const O = {fill:"#fff3e0",stroke:"#e65100"}; // orange
+const R = {fill:"#fce4ec",stroke:"#c62828"}; // red/pink
+const P = {fill:"#ede7f6",stroke:"#4527a0"}; // purple
+const Y = {fill:"#fff9c4",stroke:"#f9a825"}; // yellow
+const T = {fill:"#e0f2f1",stroke:"#00695c"}; // teal
+const Gr={fill:"#f5f5f5",stroke:"#616161"}; // gray
+const Br={fill:"#fdfcfb",stroke:"#bdbdbd"}; // brown/gray
+
+// ── Title ──
+add(txt(["虾指挥 · 微服务系统架构图",
+          "XiaZhiHui Microservice Architecture — Excalidraw 手绘风格"],
+     600, 30, {size:20,weight:"800",anchor:"middle",fill:"#1a1a2e",seed:1}));
+
+// ============================================================
+//  SECTION 1: Browser Client (top center)
+// ============================================================
+add(rrect(620, 65, 360, 88, {fill:"#e3f2fd",stroke:"#1565c0",sw:2.2,rough:1.5,seed:10}));
+add(txt(["🌐 浏览器客户端", "Browser · HTML/JS/CSS (web/)"],
+     635, 92, {size:13,weight:"700",fill:"#0d47a1",seed:11}));
+add(txt(["HTTP + SSE 与 Web UI 通信 · port 3001"],
+     635, 122, {size:9.5,fill:"#555",seed:12}));
+
+// ============================================================
+//  SECTION 2: OpenClaw Web UI (central container)
+// ============================================================
+add(rrect(60, 175, 1340, 660, {fill:"#f9f9fb",stroke:"#6c5ce7",sw:2.2,rough:2.0,seed:20}));
+add(txt(["⚙ OpenClaw Web UI (server.js · Node.js)"],
+     80, 202, {size:13,weight:"700",fill:"#6c5ce7",seed:21}));
+
+// --- HTTP Routes ---
+add(rrect(90, 218, 275, 138, {fill:B.fill,stroke:B.stroke,sw:2,rough:1.3,seed:30}));
+add(txt(["📡 HTTP 路由层", "routes.js"],
+     105, 244, {size:12,weight:"700",fill:"#0d47a1",seed:31}));
+add(txt([
+  "• GET  /api/agents",
+  "• POST /api/upload",
+  "• GET  /api/events  (SSE)",
+  "• CRUD /api/sessions",
+  "• POST /api/setup",
+], 105, 266, {size:9.5,fill:"#333",seed:32}));
+
+// --- Proxy ---
+add(rrect(395, 218, 255, 138, {fill:O.fill,stroke:O.stroke,sw:2,rough:1.4,seed:40}));
+add(txt(["🔀 HTTP 代理层", "proxy.js"],
+     410, 244, {size:12,weight:"700",fill:"#bf360c",seed:41}));
+add(txt([
+  "转发 /v1/* → Gateway",
+  "Bearer Token 鉴权",
+  "超时 180s · 断连中止",
+  "目标: localhost:18789",
+], 410, 266, {size:9.5,fill:"#333",seed:42}));
+
+// --- Agent Routes ---
+add(rrect(690, 218, 285, 138, {fill:G.fill,stroke:G.stroke,sw:2,rough:1.3,seed:50}));
+add(txt(["🤖 Agent 管理层", "agent-routes.js"],
+     705, 244, {size:12,weight:"700",fill:"#1b5e20",seed:51}));
+add(txt([
+  "• Agent CRUD",
+  "• Skill 绑定管理",
+  "• AGENTS.md / TOOLS.md",
+  "• BOOTSTRAP.md 管理",
+], 705, 266, {size:9.5,fill:"#333",seed:52}));
+
+// --- FS Store ---
+add(rrect(1015, 218, 275, 138, {fill:P.fill,stroke:P.stroke,sw:2,rough:1.3,seed:60}));
+add(txt(["💾 文件存储层", "fs-store.js"],
+     1030, 244, {size:12,weight:"700",fill:"#311b92",seed:61}));
+add(txt([
+  "• openclaw.json 读写",
+  "• Session 持久化",
+  "• Workspace 文件代理",
+  "• Skill 扫描",
+], 1030, 266, {size:9.5,fill:"#333",seed:62}));
+
+// --- SSE Manager ---
+add(rrect(90, 385, 275, 108, {fill:"#e8f5e9",stroke:"#27ae60",sw:2,rough:1.2,seed:70}));
+add(txt(["📤 SSE 管理器", "sse-manager.js"],
+     105, 411, {size:12,weight:"700",fill:"#1e8449",seed:71}));
+add(txt([
+  "向浏览器推送实时事件",
+  "status / gateway",
+  "subagent-progress / done",
+], 105, 433, {size:9.5,fill:"#333",seed:72}));
+
+// --- WS Client ---
+add(rrect(395, 385, 255, 108, {fill:"#fbe9e7",stroke:"#d84315",sw:2,rough:1.2,seed:80}));
+add(txt(["🔌 WebSocket 客户端", "ws-client.js"],
+     410, 411, {size:12,weight:"700",fill:"#bf360c",seed:81}));
+add(txt([
+  "连接 Gateway WS",
+  "桥接事件 → SSE Manager",
+  "connected/disconnected",
+], 410, 433, {size:9.5,fill:"#333",seed:82}));
+
+// --- Session Sync ---
+add(rrect(690, 385, 285, 108, {fill:"#e3f2fd",stroke:"#1565c0",sw:2,rough:1.2,seed:90}));
+add(txt(["🔄 Session 同步", "session-sync.js"],
+     705, 411, {size:12,weight:"700",fill:"#0d47a1",seed:91}));
+add(txt([
+  "同步 Gateway 会话状态",
+  "subagent Gateway 事件处理",
+  "readGatewayAssistantMessages",
+], 705, 433, {size:9.5,fill:"#333",seed:92}));
+
+// --- Roster Sync ---
+add(rrect(1015, 385, 275, 108, {fill:Y.fill,stroke:Y.stroke,sw:2,rough:1.2,seed:100}));
+add(txt(["📋 Roster 同步", "roster-sync.js"],
+     1030, 411, {size:12,weight:"700",fill:"#6d4c00",seed:101}));
+add(txt([
+  "Agent 花名册同步",
+  "openclaw.json 变更监听",
+  "fs.watch → syncAllRosters",
+], 1030, 433, {size:9.5,fill:"#333",seed:102}));
+
+// --- Static File Server ---
+add(rrect(90, 520, 275, 95, {fill:"#f3e5f5",stroke:"#7b1fa2",sw:2,rough:1.1,seed:110}));
+add(txt(["📁 静态文件服务", "web/ 目录"],
+     105, 546, {size:12,weight:"700",fill:"#4a148c",seed:111}));
+add(txt([
+  "HTML / JS / CSS / SVG / TTF",
+  "no-cache 策略 (开发)",
+  "uploads/ 文件上传",
+], 105, 568, {size:9.5,fill:"#333",seed:112}));
+
+// --- Debug Trace ---
+add(rrect(395, 520, 255, 95, {fill:Gr.fill,stroke:Gr.stroke,sw:2,rough:1.1,seed:120}));
+add(txt(["🐛 Debug 追踪", "debug-trace.js"],
+     410, 546, {size:12,weight:"700",fill:"#212121",seed:121}));
+add(txt([
+  "POST /api/log  → 记录",
+  "GET  /api/logs → 查询",
+  "POST /api/logs/clear",
+], 410, 568, {size:9.5,fill:"#333",seed:122}));
+
+// --- Frontend UI ---
+add(rrect(690, 520, 285, 95, {fill:"#e8f5e9",stroke:"#1b5e20",sw:2,rough:1.1,seed:130}));
+add(txt(["🖥️ 前端 UI (web/)", "浏览器中运行"],
+     705, 546, {size:12,weight:"700",fill:"#1b5e20",seed:131}));
+add(txt([
+  "• Chat 界面 · 多 Agent 对话",
+  "• SSE 事件流渲染",
+  "• Agent/Skill 管理面板",
+], 705, 566, {size:9.5,fill:"#333",seed:132}));
+
+// --- Skills System ---
+add(rrect(1015, 520, 275, 95, {fill:R.fill,stroke:R.stroke,sw:2,rough:1.1,seed:140}));
+add(txt(["🧩 Skill 系统"],
+     1030, 546, {size:12,weight:"700",fill:"#b71c1c",seed:141}));
+add(txt([
+  "• 全局 Skill 扫描",
+  "• extraDirs Skill 扫描",
+  "• Skill ↔ Agent 绑定",
+], 1030, 568, {size:9.5,fill:"#333",seed:142}));
+
+// ============================================================
+//  SECTION 3: OpenClaw Gateway (bottom)
+// ============================================================
+add(rrect(340, 650, 960, 175, {fill:"#fffde7",stroke:"#f9a825",sw:2.5,rough:2.2,seed:200}));
+add(txt(["⬛ 外部服务 · OpenClaw Gateway (Go)  —  localhost:18789"],
+     360, 678, {size:13,weight:"700",fill:"#f57f17",seed:201}));
+
+// Gateway Core
+add(rrect(375, 695, 255, 105, {fill:"#fffde7",stroke:"#fbc02d",sw:1.8,rough:1.0,seed:210}));
+add(txt(["🧠 Gateway 核心"],
+     390, 723, {size:11,weight:"700",fill:"#6d4c00",seed:211}));
+add(txt([
+  "AI 模型调度 (LLM)",
+  "Tool 执行引擎",
+  "session 生命周期管理",
+], 390, 743, {size:9.5,fill:"#444",seed:212}));
+
+// Gateway WS
+add(rrect(670, 695, 255, 105, {fill:"#e3f2fd",stroke:"#1e88e5",sw:1.8,rough:1.0,seed:220}));
+add(txt(["📡 Gateway WS"],
+     685, 723, {size:11,weight:"700",fill:"#0d47a1",seed:221}));
+add(txt([
+  "WebSocket 事件推送",
+  "事件: session.tool",
+  "agent · sessions.changed",
+], 685, 743, {size:9.5,fill:"#444",seed:222}));
+
+// Gateway Config
+add(rrect(965, 695, 255, 105, {fill:"#efebe9",stroke:"#795548",sw:1.8,rough:1.0,seed:230}));
+add(txt(["🗂️ Gateway 配置"],
+     980, 723, {size:11,weight:"700",fill:"#3e2723",seed:231}));
+add(txt([
+  "openclaw.json (集中配置)",
+  "Agent 定义 · Model 配置",
+  "Skills · Subagents 定义",
+], 980, 743, {size:9.5,fill:"#444",seed:232}));
+
+// ============================================================
+//  SECTION 4: Agent Workspaces (left)
+// ============================================================
+add(rrect(60, 845, 255, 165, {fill:"#fdfcfb",stroke:"#bdbdbd",sw:1.5,rough:1.5,seed:300}));
+add(txt(["📂 Agent Workspaces"],
+     78, 873, {size:12,weight:"700",fill:"#757575",seed:301}));
+add(txt([
+  "~/.openclaw/workspace-xxx/",
+  "",
+  "AGENTS.md  — 系统提示词",
+  "TOOLS.md   — 工具定义",
+  "BOOTSTRAP.md — 初始化",
+  "Skills (绑定的技能文件)",
+  "",
+  "每个 Agent 拥有独立 workspace",
+], 72, 892, {size:9,fill:"#333",seed:302}));
+
+// ============================================================
+//  SECTION 5: Connection Arrows
+// ============================================================
+
+// Browser → Web UI (HTTP)
+add(rarrow(800, 153, 800, 173, "HTTP / REST",
+  {stroke:"#1565c0",sw:2,rough:1,markerEnd:"url(#ab)",lsize:10,ldy:-10,seed:400}));
+
+// Browser → Web UI (SSE, dashed)
+add(rarrow(730, 153, 690, 173, "SSE 事件流",
+  {stroke:"#2e7d32",sw:1.5,rough:0.8,dash:"5,3",markerEnd:"url(#ag)",lsize:9,ldy:-10,seed:401}));
+
+// Web UI proxy → Gateway
+add(rarrow(525, 356, 640, 688, "/v1/* 代理",
+  {stroke:"#e65100",sw:2,rough:1.2,markerEnd:"url(#ao)",lsize:10,ldy:12,seed:410}));
+
+// WS Client → Gateway WS
+add(rarrow(660, 492, 800, 688, "WebSocket",
+  {stroke:"#d84315",sw:2,rough:1.2,markerEnd:"url(#ar)",lsize:10,ldy:12,seed:420}));
+
+// Gateway WS → WS Client (event, reverse)
+add(rarrow(800, 695, 680, 492, "事件推送",
+  {stroke:"#8e44ad",sw:1.5,rough:1,dash:"4,3",markerEnd:"url(#ap)",lsize:9,ldy:-10,seed:421}));
+
+// SSE Manager → Browser (reverse, dashed)
+add(rarrow(250, 440, 680, 153, "SSE 推送",
+  {stroke:"#2e7d32",sw:1.5,rough:1,dash:"5,3",markerEnd:"url(#ag)",lsize:9,ldy:-12,seed:430}));
+
+// Agent Routes ↔ FS Store (double-headed, dotted)
+add(rline(1015, 287, 1050, 287,
+  {stroke:"#4527a0",sw:1.2,rough:0.8,dash:"3,3",seed:440}));
+add(rline(1050, 420, 1080, 420,
+  {stroke:"#1565c0",sw:1.2,rough:0.8,dash:"3,3",seed:441}));
+
+// ============================================================
+//  SECTION 6: Data Flow Summary (bottom band)
+// ============================================================
+add(rrect(90, 1025, 920, 100, {fill:"#f8f9fa",stroke:"#90a4ae",sw:1.2,rough:1.0,seed:500}));
+add(txt(["⚡ 核心数据流"],
+     105, 1053, {size:12,weight:"700",fill:"#37474f",seed:501}));
+
+const flowSteps = [
+  {label:"① 用户发消息", fill:"#e3f2fd", stroke:"#1565c0", x:108},
+  {label:"② 代理到 Gateway", fill:"#fff3e0", stroke:"#e65100", x:278},
+  {label:"③ Gateway 执行", fill:"#e8f5e9", stroke:"#2e7d32", x:448},
+  {label:"④ WS 事件", fill:"#fbe9e7", stroke:"#d84315", x:618},
+  {label:"⑤ SSE 推送", fill:"#ede7f6", stroke:"#4527a0", x:788},
+];
+flowSteps.forEach((s,i) => {
+  add(rrect(s.x, 1060, 148, 30, {fill:s.fill,stroke:s.stroke,sw:1.2,rough:0.8,seed:510+i}));
+  add(txt([s.label], s.x+74, 1082, {size:10,fill:s.stroke,anchor:"middle",seed:520+i}));
+  if (i < flowSteps.length-1) {
+    add(rline(s.x+150, 1075, s.x+276, 1075,
+      {stroke:"#90a4ae",sw:1.2,rough:0.6,markerEnd:"url(#ad)",seed:530+i}));
+  }
+});
+
+// ============================================================
+//  SECTION 7: Annotation (right)
+// ============================================================
+add(rellipse(1300, 920, 130, 52, {fill:"#fff9c4",stroke:"#f9a825",sw:1.5,rough:1.5,seed:600}));
+add(txt(["配置变更时自动触发", "Roster 同步"],
+     1300, 912, {size:10,fill:"#6d4c00",anchor:"middle",seed:601}));
+add(txt(["(fs.watch openclaw.json)"],
+     1300, 935, {size:8.5,fill:"#888",anchor:"middle",seed:602}));
+
+// Arrow: annotation → roster-sync card
+add(rline(1175, 870, 1130, 790,
+  {stroke:"#f9a825",sw:1,rough:1,dash:"3,3",seed:610}));
+
+// ============================================================
+//  SECTION 8: Legend (bottom right)
+// ============================================================
+add(rrect(1370, 1025, 300, 115, {fill:"#fafafa",stroke:"#cfd8dc",sw:1,rough:0.8,seed:700}));
+add(txt(["图例 / Legend"], 1385, 1053, {size:11,weight:"700",fill:"#546e7a",seed:701}));
+const legs = [
+  ["#1565c0","HTTP / REST"],
+  ["#2e7d32","SSE (Server-Sent Events)"],
+  ["#d84315","WebSocket"],
+  ["#e65100","HTTP 代理"],
+  ["#8e44ad","文件 I/O"],
+];
+legs.forEach((l,i) => {
+  const lx = 1385, ly = 1070 + i*15;
+  add(rline(lx, ly+3, lx+20, ly+3, {stroke:l[0],sw:2.5,rough:0.5,seed:710+i}));
+  add(txt([l[1]], lx+26, ly+6, {size:9.5,fill:"#444",seed:720+i}));
+});
+
+// Footer
+add(txt([
+  "手绘风格架构图 v1.0  ·  无外部依赖 · 单文件 HTML  ·  基于 Excalidraw 视觉风格  ·  虾指挥 XiaZhiHui"
+], 850, 1220, {size:9.5,fill:"#bbb",anchor:"middle",seed:800}));
+
+console.log("[xiazhi-architecture] ✅ Diagram rendered successfully.");
+</script>
+</body>
+</html>

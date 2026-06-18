@@ -22,6 +22,8 @@ const SessionInteraction = {
         created_at: Date.now(),
         updated_at: Date.now(),
         messages: [],
+        // per-session workspace：创建时快照当前全局 workspace，空=用默认
+        workspace: (State.workspace && State.workspace.path) || '',
       };
       SessionStore.save(newSession);
       State.setState({
@@ -81,5 +83,21 @@ const SessionInteraction = {
       }
     }
     session.messages.push({ role: 'assistant', content: '', announces: [{ agentId: agentId || '', content: content }] });
+  },
+
+  /**
+   * 更新指定会话的 workspace 绑定
+   * @param {string} sessionId - 会话 ID，空则用当前会话
+   * @param {string} workspace - workspace 路径，空=解除绑定
+   */
+  updateWorkspace: function (sessionId, workspace) {
+    if (!sessionId) sessionId = State.currentSessionId;
+    if (!sessionId) return;
+    var session = SessionStore.get(sessionId);
+    if (!session) return;
+    session.workspace = workspace || '';
+    session.updated_at = Date.now();
+    SessionStore.save(session);
+    State.setState({ sessions: SessionStore.getList() });
   },
 };

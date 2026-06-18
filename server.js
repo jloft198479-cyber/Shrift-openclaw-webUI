@@ -244,16 +244,21 @@ function collectBody(req, callback) {
   const chunks = [];
   let size = 0;
   let oversized = false;
+  let done = false;
   req.on('data', function (c) {
     size += c.length;
-    if (size > MAX_BODY_SIZE) {
+    if (size > MAX_BODY_SIZE && !oversized) {
       oversized = true;
       req.destroy();
+      // destroy 可能不触发 end 事件，立即回调防止请求挂起
+      if (!done) { done = true; callback(null, null, new Error('Request body too large (max ' + (MAX_BODY_SIZE / 1024 / 1024) + 'MB)')); }
       return;
     }
     chunks.push(c);
   });
   req.on('end', function () {
+    if (done) return;
+    done = true;
     if (oversized || size > MAX_BODY_SIZE) {
       callback(null, null, new Error('Request body too large (max ' + (MAX_BODY_SIZE / 1024 / 1024) + 'MB)'));
       return;

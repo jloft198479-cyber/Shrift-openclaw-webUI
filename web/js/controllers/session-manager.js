@@ -151,7 +151,12 @@ const SessionManager = {
   },
 
   _beforeSwitch: function () {
-    // 会话切换前的统一清理：停止流式 + 清除调度状态 + 隐藏加载指示
+    // 会话切换前的统一清理：停止 agent run + 停止流式 + 清除调度状态 + 隐藏加载指示
+    // 停止 Gateway 上的 agent run（无活跃 run 时无副作用）
+    if (typeof Api !== 'undefined' && Api._currentSessionKey) {
+      Api.stopAgent(Api._currentSessionKey);
+      Api._currentSessionKey = '';
+    }
     StreamRenderer.endStreaming();
     if (typeof ChatController !== 'undefined' && ChatController._clearDispatchState) {
       ChatController._clearDispatchState();
@@ -245,6 +250,43 @@ const SessionManager = {
     scrollToBottom(document.getElementById('messages'), false);
     const sb = document.getElementById('scroll-bottom'); if (sb) sb.style.display = 'none';
     document.getElementById('input')?.focus();
+
+    // per-session workspace：切换会话时自动切到该会话绑定的目录
+    SessionManager._syncWorkspace(session);
+  },
+
+  /**
+   * 同步当前会话绑定的 workspace 到全局
+   * - session.workspace 非空 → 切到该目录
+   * - session.workspace 为空 → 清除（回到默认）
+   * - 与当前全局一致 → 不操作
+   * 复用现有 Api.setWorkspace / clearWorkspace 链路
+   */
+  _syncWorkspace: function (session) {
+    if (!session) return;
+    var targetWs = session.workspace || '';
+    var currentWs = (State.workspace && State.workspace.path) || '';
+    // 归一化比较（斜杠统一 + 去尾斜杠 + 小写）
+    var norm = function (p) { return (p || '').replace(/[\\/]+/g, '/').replace(/\/$/, '').toLowerCase(); };
+    if (norm(targetWs) === norm(currentWs)) return;
+
+    if (targetWs) {
+      Api.setWorkspace(targetWs).then(function (result) {
+        if (result && result.success) {
+          State.setState({ workspace: { path: result.path, exists: true } });
+        }
+      }).catch(function (err) {
+        console.warn('[Session] Failed to sync workspace:', err.message);
+      });
+    } else {
+      Api.clearWorkspace().then(function (result) {
+        if (result && result.success) {
+          State.setState({ workspace: { path: '', exists: false } });
+        }
+      }).catch(function (err) {
+        console.warn('[Session] Failed to clear workspace:', err.message);
+      });
+    }
   },
 
   deleteSession: function (id, e) {

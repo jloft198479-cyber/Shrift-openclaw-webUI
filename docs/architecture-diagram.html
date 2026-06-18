@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>虾指挥 — OpenClaw Web UI 技术架构图</title>
+<style>
+:root {
+  --c-bg: #f8fafc;
+  --c-canvas: #ffffff;
+  --c-border: #cbd5e1;
+  --c-border-dark: #94a3b8;
+  --c-text-main: #0f172a;
+  --c-text-sub: #64748b;
+  --c-accent: #1e293b;
+  --c-highlight: #f1f5f9;
+  --c-red: #dc2626;
+  --c-green: #16a34a;
+  --c-blue: #2563eb;
+  --c-amber: #d97706;
+  --font-ui: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'SF Mono', Monaco, Consolas, monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: var(--c-bg); font-family: var(--font-ui); color: var(--c-text-main); padding: 32px; }
+
+.diagram-canvas {
+  background: var(--c-canvas);
+  border: 2px solid var(--c-border);
+  padding: 32px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+.diagram-header {
+  border-bottom: 2px solid var(--c-text-main);
+  padding-bottom: 16px;
+  margin-bottom: 28px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+.diagram-title { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+.diagram-subtitle {
+  font-size: 11px; font-weight: 600; color: var(--c-text-sub);
+  text-transform: uppercase; letter-spacing: 1px;
+}
+.diagram-meta {
+  font-size: 11px; font-family: var(--font-mono); color: var(--c-text-sub);
+  text-align: right; line-height: 1.6;
+}
+
+/* ── Section ── */
+.section { margin-bottom: 28px; }
+.section-label {
+  font-size: 10px; font-weight: 700; color: var(--c-text-sub);
+  text-transform: uppercase; letter-spacing: 1.5px;
+  margin-bottom: 12px; padding-bottom: 6px;
+  border-bottom: 1px solid var(--c-border);
+}
+
+/* ── Layers ── */
+.layer-stack { display: flex; flex-direction: column; gap: 2px; }
+.layer {
+  border: 1px solid var(--c-border);
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+}
+.layer-tag {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  color: var(--c-canvas); background: var(--c-accent);
+  padding: 2px 8px; letter-spacing: 0.5px;
+  min-width: 80px; text-align: center; flex-shrink: 0;
+}
+.layer-tag--outline {
+  background: transparent; color: var(--c-accent);
+  border: 1px solid var(--c-accent);
+}
+.layer-content { flex: 1; }
+.layer-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.layer-desc { font-size: 12px; color: var(--c-text-sub); line-height: 1.5; }
+.layer-files {
+  font-family: var(--font-mono); font-size: 11px; color: var(--c-text-sub);
+  margin-top: 4px;
+}
+
+/* ── Flow Arrows ── */
+.flow-arrow {
+  display: flex; align-items: center; justify-content: center;
+  padding: 4px 0; color: var(--c-border-dark);
+}
+.flow-arrow svg { width: 24px; height: 20px; }
+.flow-arrow-label {
+  font-family: var(--font-mono); font-size: 10px; color: var(--c-text-sub);
+  margin-left: 8px;
+}
+
+/* ── Module Grid ── */
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.module-card {
+  border: 1px solid var(--c-border);
+  padding: 12px 14px;
+}
+.module-card--wide { grid-column: span 2; }
+.module-name {
+  font-size: 13px; font-weight: 600; margin-bottom: 4px;
+  display: flex; align-items: center; gap: 6px;
+}
+.module-role { font-size: 11px; color: var(--c-text-sub); line-height: 1.5; }
+.module-file {
+  font-family: var(--font-mono); font-size: 10px; color: var(--c-border-dark);
+  margin-top: 6px;
+}
+
+/* ── Badge ── */
+.badge {
+  display: inline-block; font-size: 9px; font-family: var(--font-mono);
+  padding: 1px 5px; border: 1px solid var(--c-text-main);
+  text-transform: uppercase; letter-spacing: 0.5px; vertical-align: middle;
+}
+.badge--filled { background: var(--c-text-main); color: var(--c-canvas); }
+.badge--red { border-color: var(--c-red); color: var(--c-red); }
+.badge--green { border-color: var(--c-green); color: var(--c-green); }
+.badge--blue { border-color: var(--c-blue); color: var(--c-blue); }
+.badge--amber { border-color: var(--c-amber); color: var(--c-amber); }
+
+/* ── Data Flow Diagram ── */
+.dataflow {
+  display: flex; align-items: stretch; gap: 0;
+  margin-top: 8px;
+}
+.df-col {
+  flex: 1; border: 1px solid var(--c-border); padding: 12px;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.df-col-header {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--c-text-sub);
+  padding-bottom: 8px; border-bottom: 1px solid var(--c-border);
+  text-align: center;
+}
+.df-node {
+  border: 1px solid var(--c-border); padding: 8px 10px;
+  font-size: 12px; text-align: center;
+}
+.df-node--active { border-color: var(--c-accent); border-width: 2px; }
+.df-node-label { font-weight: 600; font-size: 12px; }
+.df-node-sub { font-size: 10px; color: var(--c-text-sub); font-family: var(--font-mono); margin-top: 2px; }
+.df-arrow-row {
+  display: flex; align-items: center; justify-content: center;
+  padding: 0 4px; flex-shrink: 0; min-width: 32px;
+}
+.df-arrow-row svg { width: 28px; height: 16px; }
+
+/* ── Config Table ── */
+.config-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.config-table th {
+  text-align: left; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 1px;
+  color: var(--c-text-sub); padding: 6px 10px;
+  border-bottom: 2px solid var(--c-border);
+}
+.config-table td {
+  padding: 6px 10px; border-bottom: 1px solid var(--c-border);
+  vertical-align: top;
+}
+.config-table td:first-child { font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
+
+/* ── Two-col layout ── */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+/* ── API Table ── */
+.api-group { margin-bottom: 12px; }
+.api-group-title {
+  font-size: 11px; font-weight: 700; color: var(--c-text-sub);
+  text-transform: uppercase; letter-spacing: 1px;
+  margin-bottom: 6px;
+}
+.api-row {
+  display: flex; gap: 8px; align-items: baseline;
+  padding: 3px 0; font-size: 12px;
+  border-bottom: 1px dotted var(--c-border);
+}
+.api-method {
+  font-family: var(--font-mono); font-size: 10px; font-weight: 700;
+  min-width: 48px; text-align: center; flex-shrink: 0;
+  padding: 1px 4px; border: 1px solid var(--c-border);
+}
+.api-path { font-family: var(--font-mono); font-size: 11px; min-width: 220px; flex-shrink: 0; }
+.api-desc { color: var(--c-text-sub); font-size: 11px; }
+
+/* ── Assessment ── */
+.assess-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.assess-card { border: 1px solid var(--c-border); padding: 14px; }
+.assess-label {
+  font-size: 10px; font-weight: 700; color: var(--c-text-sub);
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;
+}
+.assess-value { font-size: 18px; font-weight: 700; margin-bottom: 4px; }
+.assess-note { font-size: 11px; color: var(--c-text-sub); line-height: 1.5; }
+
+/* ── Footer ── */
+.diagram-footer {
+  margin-top: 24px; padding-top: 12px;
+  border-top: 1px solid var(--c-border);
+  font-size: 10px; color: var(--c-text-sub);
+  display: flex; justify-content: space-between;
+}
+</style>
+</head>
+<body>
+<div class="diagram-canvas">
+
+  <!-- ═══ Header ═══ -->
+  <div class="diagram-header">
+    <div>
+      <h1 class="diagram-title">虾指挥 Shrift — OpenClaw Web UI</h1>
+      <p class="diagram-subtitle">SYSTEM ARCHITECTURE & TECHNICAL SPECIFICATION</p>
+    </div>
+    <div class="diagram-meta">
+      v1.0.0 / MIT License<br/>
+      Node.js + Vanilla JS<br/>
+      2026-06-12
+    </div>
+  </div>
+
+  <!-- ═══ 1. 系统全景 ═══ -->
+  <div class="section">
+    <div class="section-label">01 — 系统全景 / SYSTEM OVERVIEW</div>
+    <div class="dataflow">
+      <div class="df-col" style="flex: 0.8;">
+        <div class="df-col-header">用户层</div>
+        <div class="df-node df-node--active">
+          <div class="df-node-label">浏览器 / PWA</div>
+          <div class="df-node-sub">index.html + JS modules</div>
+        </div>
+        <div class="df-node">
+          <div class="df-node-label">shrift.bat</div>
+          <div class="df-node-sub">一键启动入口</div>
+        </div>
+      </div>
+      <div class="df-arrow-row">
+        <svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="22" y2="8" stroke="#94a3b8" stroke-width="1.5"/><polygon points="22,4 28,8 22,12" fill="#94a3b8"/></svg>
+      </div>
+      <div class="df-col" style="flex: 1.4;">
+        <div class="df-col-header">Web Server <span class="badge badge--filled">NODE.JS HTTP</span></div>
+        <div class="df-node df-node--active">
+          <div class="df-node-label">server.js — HTTP 服务器</div>
+          <div class="df-node-sub">:3001 / 静态资源 + API 路由</div>
+        </div>
+        <div class="three-col" style="gap:4px;">
+          <div class="df-node"><div class="df-node-label">routes.js</div><div class="df-node-sub">API 路由定义</div></div>
+          <div class="df-node"><div class="df-node-label">proxy.js</div><div class="df-node-sub">Gateway 代理</div></div>
+          <div class="df-node"><div class="df-node-label">sse-manager.js</div><div class="df-node-sub">SSE 推送</div></div>
+        </div>
+        <div class="three-col" style="gap:4px;">
+          <div class="df-node"><div class="df-node-label">agent-routes.js</div><div class="df-node-sub">Agent CRUD</div></div>
+          <div class="df-node"><div class="df-node-label">fs-store.js</div><div class="df-node-sub">文件存储层</div></div>
+          <div class="df-node"><div class="df-node-label">roster-sync.js</div><div class="df-node-sub">Roster 同步</div></div>
+        </div>
+      </div>
+      <div class="df-arrow-row" style="flex-direction: column; gap: 4px;">
+        <svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="22" y2="8" stroke="#94a3b8" stroke-width="1.5"/><polygon points="22,4 28,8 22,12" fill="#94a3b8"/></svg>
+        <span style="font-size:9px;color:var(--c-text-sub);font-family:var(--font-mono);">WS + HTTP</span>
+        <svg viewBox="0 0 28 16"><line x1="28" y1="8" x2="6" y2="8" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="3,2"/><polygon points="6,4 0,8 6,12" fill="#cbd5e1"/></svg>
+      </div>
+      <div class="df-col" style="flex: 1;">
+        <div class="df-col-header">OpenClaw Gateway</div>
+        <div class="df-node df-node--active">
+          <div class="df-node-label">Gateway 进程</div>
+          <div class="df-node-sub">:18789 / WebSocket + REST</div>
+        </div>
+        <div class="df-node">
+          <div class="df-node-label">AI Models</div>
+          <div class="df-node-sub">DeepSeek / ZhiPu / Xiaomi / Agnes</div>
+        </div>
+        <div class="df-node">
+          <div class="df-node-label">Skills & Plugins</div>
+          <div class="df-node-sub">web-search, MCP, gh-issues...</div>
+        </div>
+      </div>
+      <div class="df-arrow-row">
+        <svg viewBox="0 0 28 16"><line x1="0" y1="8" x2="22" y2="8" stroke="#94a3b8" stroke-width="1.5"/><polygon points="22,4 28,8 22,12" fill="#94a3b8"/></svg>
+      </div>
+      <div class="df-col" style="flex: 0.6;">
+        <div class="df-col-header">持久化</div>
+        <div class="df-node">
+          <div class="df-node-label">openclaw.json</div>
+          <div class="df-node-sub">Agent / Model 配置</div>
+        </div>
+        <div class="df-node">
+          <div class="df-node-label">sessions/*.json</div>
+          <div class="df-node-sub">会话持久化</div>
+        </div>
+        <div class="df-node">
+          <div class="df-node-label">workspace-*</div>
+          <div class="df-node-sub">Agent 工作目录</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 2. 前端架构 ═══ -->
+  <div class="section">
+    <div class="section-label">02 — 前端架构 / FRONTEND ARCHITECTURE (VANILLA JS, NO FRAMEWORK)</div>
+    <div class="module-grid">
+      <div class="module-card">
+        <div class="module-name"><span class="badge badge--filled">INIT</span> app.js</div>
+        <div class="module-role">应用初始化入口，按序加载各模块，恢复上次会话</div>
+        <div class="module-file">web/js/app.js</div>
+      </div>
+      <div class="module-card">
+        <div class="module-name"><span class="badge badge--blue">STATE</span> state.js</div>
+        <div class="module-role">全局状态管理，分组状态 + 发布/订阅事件系统，支持扁平/分组两种更新方式</div>
+        <div class="module-file">web/js/state.js</div>
+      </div>
+      <div class="module-card">
+        <div class="module-name"><span class="badge badge--green">API</span> api.js</div>
+        <div class="module-role">HTTP 请求封装层，SSE 流式解析，AbortController 中止控制</div>
+        <div class="module-file">web/js/api.js</div>
+      </div>
+      <div class="module-card">
+        <div class="module-name"><span class="badge badge--amber">CONST</span> constants.js</div>
+        <div class="module-role">全局常量定义</div>
+        <div class="module-file">web/js/constants.js</div>
+      </div>
+    </div>
+    <div style="height: 8px;"></div>
+    <div class="module-grid">
+      <div class="module-card module-card--wide">
+        <div class="module-name">controllers/</div>
+        <div class="module-role">
+          <strong>chat-controller.js</strong> — 消息发送、流式渲染调度、子Agent调度状态机<br/>
+          <strong>session-manager.js</strong> — 会话生命周期管理 (API + localStorage 双写)<br/>
+          <strong>ws-bridge.js</strong> — SSE 事件桥，EventSource 客户端，指数退避重连<br/>
+          <strong>event-router.js</strong> — 连接状态 UI，Gateway 等待/重试界面
+        </div>
+        <div class="module-file">web/js/controllers/</div>
+      </div>
+      <div class="module-card module-card--wide">
+        <div class="module-name">components/</div>
+        <div class="module-role">
+          <strong>chat-view.js</strong> — 对话视图容器<br/>
+          <strong>message-renderer.js</strong> — 消息气泡渲染 (DOMPurify + marked)<br/>
+          <strong>stream-renderer.js</strong> — 流式文本渲染 (rAF 调度)<br/>
+          <strong>session-list.js</strong> — 会话列表 / <strong>agent-list.js</strong> — Agent 列表<br/>
+          <strong>agent-modal.js</strong> — Agent 编辑弹窗 / <strong>model-picker.js</strong> — 模型选择器<br/>
+          <strong>welcome-view.js</strong> — 欢迎页 / <strong>virtual-list.js</strong> — 虚拟列表
+        </div>
+        <div class="module-file">web/js/components/</div>
+      </div>
+    </div>
+    <div style="height: 8px;"></div>
+    <div class="module-grid">
+      <div class="module-card">
+        <div class="module-name">ui/menu-system.js</div>
+        <div class="module-role">上下文菜单系统</div>
+      </div>
+      <div class="module-card">
+        <div class="module-name">ui/mention-completer.js</div>
+        <div class="module-role">@提及自动补全</div>
+      </div>
+      <div class="module-card">
+        <div class="module-name">ui/interaction-bindings.js</div>
+        <div class="module-role">全局键盘/点击事件绑定</div>
+      </div>
+      <div class="module-card">
+        <div class="module-name">views/ + lib/ + utils/</div>
+        <div class="module-role">视图层、第三方库、工具函数</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 3. 后端模块 ═══ -->
+  <div class="section">
+    <div class="section-label">03 — 后端模块 / BACKEND MODULE MAP</div>
+    <div class="module-grid">
+      <div class="module-card module-card--wide">
+        <div class="module-name"><span class="badge badge--filled">CORE</span> server.js</div>
+        <div class="module-role">HTTP 服务器核心。静态资源服务、路由分发、Setup 模式检测、配置热监听（fs.watch openclaw.json）。零依赖 HTTP server，仅依赖 ws 模块。</div>
+        <div class="module-file">server.js — 396 行</div>
+      </div>
+      <div class="module-card module-card--wide">
+        <div class="module-name"><span class="badge badge--filled">CORE</span> ws-client.js</div>
+        <div class="module-role">Gateway WebSocket 客户端。JSON-RPC 协议握手，sessions.subscribe 事件订阅，心跳保活（25s ping），指数退避自动重连（3s~30s），session polling 降级方案。</div>
+        <div class="module-file">ws-client.js — 275 行 / dep: ws@^8.20.1</div>
+      </div>
+      <div class="module-card">
+        <div class="module-name">proxy.js</div>
+        <div class="module-role">Gateway HTTP 反向代理。透传 /v1/* 请求，注入 Bearer Token，支持 SSE 流透传，健康检查端点。</div>
+        <div class="module-file">proxy.js — 88 行</div>
+      </div>
+      <div class="module-card">
+        <div class="module-name">sse-manager.js</div>
+        <div class="module-role">SSE 连接池管理。客户端注册/注销，广播 Gateway 状态与 Agent 变更事件，死连接清理。</div>
+        <div class="module-file">sse-manager.js — 66 行</div>
+      </div>
+      <div class="module-card module-card--wide">
+        <div class="module-name">fs-store.js</div>
+        <div class="module-role">文件系统存储层。openclaw.json 读写（原子写入 via tmp+rename），Agent 配置管理，Session JSON 持久化，Skill 目录扫描（global / extraDirs），路径安全校验（_isPathWithinAllowedRoots），工作目录清理。</div>
+        <div class="module-file">fs-store.js — 420 行</div>
+      </div>
+      <div class="module-card">
+        <div class="module-name">agent-routes.js</div>
+        <div class="module-role">Agent CRUD API。创建/更新/删除 Agent，Skill 绑定/解绑，AGENTS.md/TOOLS.md 读写，30s 缓存，工作目录自动重命名。</div>
+        <div class="module-file">agent-routes.js — 429 行</div>
+      </div>
+      <div class="module-card">
+        <div class="module-name">roster-sync.js</div>
+        <div class="module-role">Agent Roster 同步引擎。Skill symlink/junction 管理，allowAgents 引用完整性校验，TOOLS.md 系统段落同步（团队成员 + 技能），IDENTITY.md / BOOTSTRAP.md 自动生成。</div>
+        <div class="module-file">roster-sync.js — 386 行</div>
+      </div>
+      <div class="module-card">
+        <div class="module-name">session-sync.js</div>
+        <div class="module-role">事件驱动的 Session 文件同步。监听 Gateway WS 事件，增量读取 JSONL 文件（offset 追踪），提取 assistant 消息广播到前端，过滤心跳会话。</div>
+        <div class="module-file">session-sync.js — 316 行</div>
+      </div>
+      <div class="module-card">
+        <div class="module-name">routes.js</div>
+        <div class="module-role">API 路由定义表。30+ 路由规则（正则匹配），文件上传处理（白名单 + 10MB 限制），Setup 配置向导 API。</div>
+        <div class="module-file">routes.js — 291 行</div>
+      </div>
+      <div class="module-card">
+        <div class="module-name">debug-trace.js</div>
+        <div class="module-role">调试日志追踪。前端/后端日志收集、查询、清理。</div>
+        <div class="module-file">debug-trace.js</div>
+      </div>
+      <div class="module-card">
+        <div class="module-name">launcher.js</div>
+        <div class="module-role">启动器。自动探测 Node.js / OpenClaw 路径，NW.js 窗口管理。</div>
+        <div class="module-file">launcher.js</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 4. 核心数据流 ═══ -->
+  <div class="section">
+    <div class="section-label">04 — 核心数据流 / MESSAGE FLOW (CHAT COMPLETION)</div>
+    <div style="display: flex; align-items: flex-start; gap: 4px; flex-wrap: wrap;">
+      <div style="flex:1; min-width: 120px; border:1px solid var(--c-border); padding:10px; text-align:center;">
+        <div style="font-size:11px; font-weight:700;">1. 用户输入</div>
+        <div style="font-size:10px; color:var(--c-text-sub); font-family:var(--font-mono); margin-top:4px;">ChatController.sendMessage()</div>
+      </div>
+      <div style="display:flex;align-items:center;padding-top:14px;"><svg width="20" height="12" viewBox="0 0 20 12"><line x1="0" y1="6" x2="14" y2="6" stroke="#94a3b8" stroke-width="1.5"/><polygon points="14,3 20,6 14,9" fill="#94a3b8"/></svg></div>
+      <div style="flex:1; min-width: 120px; border:1px solid var(--c-border); padding:10px; text-align:center;">
+        <div style="font-size:11px; font-weight:700;">2. 构建请求</div>
+        <div style="font-size:10px; color:var(--c-text-sub); font-family:var(--font-mono); margin-top:4px;">MessageBuilder → Api.chat()</div>
+      </div>
+      <div style="display:flex;align-items:center;padding-top:14px;"><svg width="20" height="12" viewBox="0 0 20 12"><line x1="0" y1="6" x2="14" y2="6" stroke="#94a3b8" stroke-width="1.5"/><polygon points="14,3 20,6 14,9" fill="#94a3b8"/></svg></div>
+      <div style="flex:1; min-width: 120px; border:1px solid var(--c-border); padding:10px; text-align:center;">
+        <div style="font-size:11px; font-weight:700;">3. 代理转发</div>
+        <div style="font-size:10px; color:var(--c-text-sub); font-family:var(--font-mono); margin-top:4px;">proxy.js → Gateway :18789</div>
+      </div>
+      <div style="display:flex;align-items:center;padding-top:14px;"><svg width="20" height="12" viewBox="0 0 20 12"><line x1="0" y1="6" x2="14" y2="6" stroke="#94a3b8" stroke-width="1.5"/><polygon points="14,3 20,6 14,9" fill="#94a3b8"/></svg></div>
+      <div style="flex:1; min-width: 120px; border:2px solid var(--c-accent); padding:10px; text-align:center;">
+        <div style="font-size:11px; font-weight:700;">4. SSE 流式响应</div>
+        <div style="font-size:10px; color:var(--c-text-sub); font-family:var(--font-mono); margin-top:4px;">text/event-stream → delta</div>
+      </div>
+      <div style="display:flex;align-items:center;padding-top:14px;"><svg width="20" height="12" viewBox="0 0 20 12"><line x1="0" y1="6" x2="14" y2="6" stroke="#94a3b8" stroke-width="1.5"/><polygon points="14,3 20,6 14,9" fill="#94a3b8"/></svg></div>
+      <div style="flex:1; min-width: 120px; border:1px solid var(--c-border); padding:10px; text-align:center;">
+        <div style="font-size:11px; font-weight:700;">5. 渲染输出</div>
+        <div style="font-size:10px; color:var(--c-text-sub); font-family:var(--font-mono); margin-top:4px;">StreamRenderer → DOM</div>
+      </div>
+    </div>
+    <div style="margin-top: 12px; border: 1px dashed var(--c-border); padding: 12px;">
+      <div style="font-size: 11px; font-weight: 700; color: var(--c-text-sub); margin-bottom: 6px;">子 Agent 调度流 (Dispatch Mode)</div>
+      <div style="font-size: 11px; color: var(--c-text-sub); line-height: 1.8; font-family: var(--font-mono);">
+        main Agent 调用 sessions_spawn → SSE [DONE] → 前端进入 dispatching 状态<br/>
+        → Gateway WS 推送 session.tool / sessions.changed 事件<br/>
+        → server.js 广播 subagent-progress / subagent-done SSE 事件<br/>
+        → session-sync.js 增量读取 JSONL → 广播 announce-result SSE<br/>
+        → ChatController.handleAnnounceResult() 渲染子 Agent 回复
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 5. API 路由 ═══ -->
+  <div class="section">
+    <div class="section-label">05 — API 路由表 / REST API ENDPOINTS</div>
+    <div class="two-col">
+      <div>
+        <div class="api-group">
+          <div class="api-group-title">Agent 管理</div>
+          <div class="api-row"><span class="api-method">GET</span><span class="api-path">/api/agents</span><span class="api-desc">Agent 列表（30s 缓存）</span></div>
+          <div class="api-row"><span class="api-method">POST</span><span class="api-path">/api/agents</span><span class="api-desc">创建 Agent</span></div>
+          <div class="api-row"><span class="api-method">GET</span><span class="api-path">/api/agents/:id</span><span class="api-desc">Agent 详情</span></div>
+          <div class="api-row"><span class="api-method">PUT</span><span class="api-path">/api/agents/:id</span><span class="api-desc">更新 Agent</span></div>
+          <div class="api-row"><span class="api-method">DELETE</span><span class="api-path">/api/agents/:id</span><span class="api-desc">删除 Agent + 清理工作目录</span></div>
+          <div class="api-row"><span class="api-method">GET/PUT</span><span class="api-path">/api/agents/:id/agents-md</span><span class="api-desc">AGENTS.md 读写</span></div>
+          <div class="api-row"><span class="api-method">GET/PUT</span><span class="api-path">/api/agents/:id/tools-md</span><span class="api-desc">TOOLS.md 读写</span></div>
+          <div class="api-row"><span class="api-method">GET/POST/PUT</span><span class="api-path">/api/agents/:id/skills</span><span class="api-desc">技能管理</span></div>
+        </div>
+        <div class="api-group">
+          <div class="api-group-title">会话管理</div>
+          <div class="api-row"><span class="api-method">GET</span><span class="api-path">/api/sessions</span><span class="api-desc">会话列表</span></div>
+          <div class="api-row"><span class="api-method">GET</span><span class="api-path">/api/sessions/:id</span><span class="api-desc">获取会话详情</span></div>
+          <div class="api-row"><span class="api-method">PUT</span><span class="api-path">/api/sessions/:id</span><span class="api-desc">保存会话</span></div>
+          <div class="api-row"><span class="api-method">DELETE</span><span class="api-path">/api/sessions/:id</span><span class="api-desc">删除会话</span></div>
+          <div class="api-row"><span class="api-method">GET</span><span class="api-path">/api/sessions/:id/sync</span><span class="api-desc">Gateway 消息同步</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="api-group">
+          <div class="api-group-title">Gateway 代理</div>
+          <div class="api-row"><span class="api-method">POST</span><span class="api-path">/v1/chat/completions</span><span class="api-desc">流式对话 (SSE 透传)</span></div>
+          <div class="api-row"><span class="api-method">*</span><span class="api-path">/v1/*</span><span class="api-desc">其他 Gateway API 透传</span></div>
+        </div>
+        <div class="api-group">
+          <div class="api-group-title">系统</div>
+          <div class="api-row"><span class="api-method">GET</span><span class="api-path">/api/health</span><span class="api-desc">Gateway 健康检查</span></div>
+          <div class="api-row"><span class="api-method">GET</span><span class="api-path">/api/events</span><span class="api-desc">SSE 事件流</span></div>
+          <div class="api-row"><span class="api-method">GET</span><span class="api-path">/api/models</span><span class="api-desc">可用模型列表</span></div>
+          <div class="api-row"><span class="api-method">PUT</span><span class="api-path">/api/models/default</span><span class="api-desc">设置默认模型</span></div>
+          <div class="api-row"><span class="api-method">GET</span><span class="api-path">/api/skills</span><span class="api-desc">全局技能列表</span></div>
+          <div class="api-row"><span class="api-method">POST</span><span class="api-path">/api/upload</span><span class="api-desc">文件上传（白名单+10MB）</span></div>
+        </div>
+        <div class="api-group">
+          <div class="api-group-title">Setup 配置向导</div>
+          <div class="api-row"><span class="api-method">POST</span><span class="api-path">/api/setup</span><span class="api-desc">保存配置</span></div>
+          <div class="api-row"><span class="api-method">POST</span><span class="api-path">/api/setup/detect</span><span class="api-desc">自动检测 OpenClaw 路径</span></div>
+          <div class="api-row"><span class="api-method">POST</span><span class="api-path">/api/setup/verify</span><span class="api-desc">验证配置路径</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 6. 技术评估 ═══ -->
+  <div class="section">
+    <div class="section-label">06 — 技术评估 / TECHNICAL ASSESSMENT</div>
+    <div class="assess-grid">
+      <div class="assess-card">
+        <div class="assess-label">架构模式</div>
+        <div class="assess-value">BFF 代理层</div>
+        <div class="assess-note">Web Server 作为 Browser 与 OpenClaw Gateway 之间的 BFF（Backend For Frontend），承担静态资源、API 聚合、SSE 桥接、会话持久化职责。轻量且职责清晰。</div>
+      </div>
+      <div class="assess-card">
+        <div class="assess-label">运行时依赖</div>
+        <div class="assess-value">1 个 npm 包</div>
+        <div class="assess-note">仅依赖 ws（WebSocket 客户端）。HTTP 服务器使用 Node.js 原生 http 模块，前端零框架（Vanilla JS + marked + DOMPurify）。极端轻量。</div>
+      </div>
+      <div class="assess-card">
+        <div class="assess-label">代码规模</div>
+        <div class="assess-value">~3,500 行</div>
+        <div class="assess-note">后端约 2,300 行（8 个核心文件），前端约 1,200 行（不含组件）。单文件模块，无构建流程，即开即用。</div>
+      </div>
+      <div class="assess-card">
+        <div class="assess-label">通信协议</div>
+        <div class="assess-value">三路通道</div>
+        <div class="assess-note">
+          <span class="badge badge--green">HTTP/SSE</span> 对话流式输出<br/>
+          <span class="badge badge--blue">WebSocket</span> Gateway 事件订阅<br/>
+          <span class="badge badge--amber">SSE</span> 前端实时推送
+        </div>
+      </div>
+      <div class="assess-card">
+        <div class="assess-label">安全设计</div>
+        <div class="assess-value">多层防护</div>
+        <div class="assess-note">DOMPurify XSS 防护，上传文件扩展名白名单，Session ID 路径遍历校验，请求体 10MB 上限，openclaw.json 原子写入（tmp+rename），路径白名单校验。</div>
+      </div>
+      <div class="assess-card">
+        <div class="assess-label">Agent 系统</div>
+        <div class="assess-value">多 Agent 协作</div>
+        <div class="assess-note">支持 main + 子 Agent 架构，sessions_spawn 智能调度，Skill symlink 管理，TOOLS.md 自动同步，allowAgents 权限控制，Roster 完整性校验。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 7. 配置清单 ═══ -->
+  <div class="section">
+    <div class="section-label">07 — 当前部署配置 / DEPLOYMENT CONFIGURATION</div>
+    <table class="config-table">
+      <thead><tr><th>配置项</th><th>值</th><th>说明</th></tr></thead>
+      <tbody>
+        <tr><td>Web UI Port</td><td>3001</td><td>HTTP 服务器监听端口</td></tr>
+        <tr><td>Gateway URL</td><td>http://127.0.0.1:18789</td><td>OpenClaw Gateway 地址（loopback only）</td></tr>
+        <tr><td>Gateway Token</td><td>hermes-local-dev</td><td>本地开发 Token（allowInsecureAuth: true）</td></tr>
+        <tr><td>Config Path</td><td>D:\AppData\openclaw\openclaw.json</td><td>OpenClaw 主配置文件</td></tr>
+        <tr><td>Default Model</td><td>deepseek/deepseek-v4-pro</td><td>主模型，fallback: zhipu 系列</td></tr>
+        <tr><td>Agents</td><td>7 个</td><td>main, 乔布斯, MrBeast, 设计师小王, 咪蒙, 知乎搜搜, 知识库小知</td></tr>
+        <tr><td>Model Providers</td><td>4 个</td><td>DeepSeek, 智谱 (ZhiPu), 小米 (MiMo), Agnes</td></tr>
+        <tr><td>MCP Servers</td><td>1 个</td><td>FlowUs (SSE transport)</td></tr>
+        <tr><td>Enabled Skills</td><td>7 个</td><td>clawhub, gh-issues, github, model-usage, nano-pdf, session-logs, summarize</td></tr>
+        <tr><td>Plugins</td><td>4 个</td><td>deepseek, duckduckgo, xiaomi, tavily (web search)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ═══ Footer ═══ -->
+  <div class="diagram-footer">
+    <span>虾指挥 Shrift OpenClaw Web UI — Technical Architecture Blueprint</span>
+    <span>Generated 2026-06-12 / Page 1 of 1</span>
+  </div>
+
+</div>
+</body>
+</html>

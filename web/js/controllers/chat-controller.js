@@ -58,7 +58,7 @@ const ChatController = {
     StreamRenderer.beginStreaming(this._cleanupChat.bind(this));
     input.value = '';
     autoResize();
-    sendBtn.disabled = true;
+    // 不禁用 sendBtn — beginStreaming → showStopBtn 已将按钮设为可点击的停止按钮
     if (thinkInd) thinkInd.style.display = 'flex';
 
     WelcomeView.hideWelcome();
@@ -188,10 +188,16 @@ const ChatController = {
 
   /**
    * 取消调度 — 用户点击 cancel 按钮时调用
-   * 清理所有 dispatch 状态，停止等待子 Agent 结果
+   * 1. 调用 chat.abort 停止 Gateway 上的 agent run（主 Agent 或已 spawn 的子 Agent）
+   * 2. 清理所有 dispatch 状态，停止等待子 Agent 结果
    */
   cancelDispatch: function () {
     DebugTrace.log('cancelDispatch', { active: this._activeSubagents.size, completed: this._completedSubagents.size });
+    // 停止 Gateway 上的 agent run（已 yield 无活跃 run 时无副作用）
+    if (Api._currentSessionKey) {
+      Api.stopAgent(Api._currentSessionKey);
+      Api._currentSessionKey = '';
+    }
     this._clearDispatchState();
     StreamRenderer._resetSendBtn();
   },
